@@ -113,6 +113,16 @@ export async function uploadReceipt(formData: FormData): Promise<ActionResponse>
     .upload(receiptPath, file, { contentType: file.type });
   if (upErr) return { error: 'Gagal mengunggah bon: ' + upErr.message };
 
+  // Hapus bon lama bila ada (ganti dengan yang baru).
+  const { data: existing } = await ctx.supabase
+    .from('purchases')
+    .select('receipt_image_url')
+    .eq('id', purchaseId)
+    .maybeSingle();
+  if (existing?.receipt_image_url && existing.receipt_image_url !== receiptPath) {
+    await ctx.supabase.storage.from('receipts').remove([existing.receipt_image_url]);
+  }
+
   const { error } = await ctx.supabase
     .from('purchases')
     .update({ receipt_image_url: receiptPath, receipt_status: 'received' })
@@ -121,5 +131,69 @@ export async function uploadReceipt(formData: FormData): Promise<ActionResponse>
 
   revalidatePath('/admin/purchases');
   revalidatePath('/admin/dashboard');
+  return { success: true };
+}
+
+/**
+ * Ubah status bon. 'pending' = tandai belum diterima + hapus file bon lama.
+ * 'received' = tandai sudah diterima (tanpa file).
+ */
+export async function setReceiptStatus(
+  purchaseId: string,
+  status: 'pending' | 'received'
+): Promise<ActionResponse> {
+  const ctx = await requireAdmin();
+  if (!ctx) return { error: 'Anda tidak punya akses admin.' };
+
+  if (status === 'pending') {
+    const { data: existing } = await ctx.supabase
+      .from('purchases')
+      .select('receipt_image_url')
+      .eq('id', purchaseId)
+      .maybeSingle();
+    if (existing?.receipt_image_url) {
+      await ctx.supabase.storage.from('receipts').remove([existing.receipt_image_url]);
+    }
+  }
+
+  const { error } = await ctx.supabase
+    .from('purchases')
+    .update({
+      receipt_image_url: status === 'pending' ? null : undefined,
+      receipt_status: status,
+    })
+    .eq('id', purchaseId);
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/purchases');
+  revalidatePath('/admin/dashboard');
+  revalidatePath('/admin/audit');
+  return { success: true };
+}
+
+/** Hapus pembelian. Stok otomatis dikurangi via trigger. */
+export async function deletePurchase(purchaseId: string): Promise<ActionResponse> {
+  const ctx = await requireAdmin();
+  if (!ctx) return { error: 'Anda tidak punya akses admin.' };
+
+  const { data: existing } = await ctx.supabase
+    .from('purchases')
+    .select('receipt_image_url')
+    .eq('id', purchaseId)
+    .maybeSingle();
+  if (!existing) return { error: 'Pembelian tidak ditemukan.' };
+
+  if (existing.receipt_image_url) {
+    await ctx.supabase.storage.from('receipts').remove([existing.receipt_image_url]);
+  }
+
+  const { error } = await ctx.supabase.from('purchases').delete().eq('id', purchaseId);
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/purchases');
+  revalidatePath('/admin/dashboard');
+  revalidatePath('/admin/audit');
+  revalidatePath('/admin/stock');
+  revalidatePath('/admin/requests');
   return { success: true };
 }

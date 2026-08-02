@@ -12,7 +12,7 @@ export default async function AdminPurchasesPage() {
     supabase
       .from('purchases')
       .select(
-        'id, request_id, project_name, material_name, store_name, qty, total_price, receipt_status, receipt_image_url, purchased_by, purchased_at'
+        'id, request_id, project_name, material_name, store_name, qty, total_price, paid, receipt_status, receipt_image_url, purchased_by, purchased_at'
       )
       .order('purchased_at', { ascending: false }),
     supabase
@@ -71,6 +71,7 @@ export default async function AdminPurchasesPage() {
       store_name: string;
       qty: string;
       total_price: number;
+      paid: boolean;
       receipt_status: PurchaseJoined['receipt_status'];
       receipt_image_url: string | null;
       purchased_by: string | null;

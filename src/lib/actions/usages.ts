@@ -61,3 +61,21 @@ export async function createMaterialUsage(formData: FormData): Promise<ActionRes
   revalidatePath('/admin/audit');
   return { success: true };
 }
+
+/** Hapus pemakaian. Stok otomatis dikembalikan via trigger. */
+export async function deleteUsage(usageId: string): Promise<ActionResponse> {
+  const ctx = await requireAdmin();
+  if (!ctx) return { error: 'Anda tidak punya akses admin.' };
+
+  const { error } = await ctx.supabase
+    .from('material_usages')
+    .delete()
+    .eq('id', usageId);
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/usage');
+  revalidatePath('/admin/dashboard');
+  revalidatePath('/admin/audit');
+  revalidatePath('/admin/stock');
+  return { success: true };
+}

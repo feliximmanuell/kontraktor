@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { createMaterialUsage } from '@/lib/actions/usages';
+import { createMaterialUsage, deleteUsage } from '@/lib/actions/usages';
+import { MaterialAutocomplete } from '@/components/material-autocomplete';
 import { EmptyState } from '@/components/empty-state';
 import {
   Card,
@@ -19,7 +20,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, Search } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Loader2, Save, Search, Trash2 } from 'lucide-react';
 import type { UsageJoined } from '@/lib/types';
 import { formatDateTime } from '@/lib/format';
 
@@ -42,9 +51,12 @@ export function UsageManager({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<UsageJoined | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -68,6 +80,20 @@ export function UsageManager({
     }
     toast.success('Pemakaian dicatat.');
     reset();
+    router.refresh();
+  }
+
+  async function onDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    const res = await deleteUsage(deleteTarget.id);
+    setDeleteBusy(false);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success('Pemakaian dihapus. Stok otomatis dikembalikan.');
+    setDeleteTarget(null);
     router.refresh();
   }
 
@@ -112,11 +138,17 @@ export function UsageManager({
                   ) : null}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="materialName">Nama Material / Barang</Label>
-                  <Input
-                    id="materialName"
-                    placeholder="Cth: Semen 50kg"
-                    {...register('materialName')}
+                  <Label>Nama Material / Barang</Label>
+                  <Controller
+                    control={control}
+                    name="materialName"
+                    render={({ field }) => (
+                      <MaterialAutocomplete
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Cth: Semen 50kg"
+                      />
+                    )}
                   />
                   {errors.materialName ? (
                     <p className="text-xs text-destructive">{errors.materialName.message}</p>
@@ -184,9 +216,21 @@ export function UsageManager({
                     {u.material_name}{' '}
                     <span className="font-normal text-muted-foreground">(-{u.qty_used})</span>
                   </p>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDateTime(u.used_at)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {formatDateTime(u.used_at)}
+                    </span>
+                    {isAdmin ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget(u)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Proyek: <span className="font-medium">{u.project_name}</span>
@@ -200,6 +244,28 @@ export function UsageManager({
           </div>
         )}
       </div>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Pemakaian?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget
+                ? `Hapus pemakaian "${deleteTarget.material_name}" (-${deleteTarget.qty_used}) di ${deleteTarget.project_name}? Stok akan dikembalikan.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={onDelete} disabled={deleteBusy}>
+              {deleteBusy ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -6,7 +6,10 @@ import {
   LayoutDashboard,
   ClipboardList,
   Receipt,
+  Wallet,
+  Boxes,
   Wrench,
+  BarChart3,
   FileSearch,
   HardHat,
 } from 'lucide-react';
@@ -18,7 +21,10 @@ const links = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/requests', label: 'Pengajuan', icon: ClipboardList },
   { href: '/admin/purchases', label: 'Pembelian', icon: Receipt },
+  { href: '/admin/payments', label: 'Pembayaran', icon: Wallet },
+  { href: '/admin/stock', label: 'Stok', icon: Boxes },
   { href: '/admin/usage', label: 'Pemakaian', icon: Wrench },
+  { href: '/admin/reports', label: 'Laporan', icon: BarChart3 },
   { href: '/admin/audit', label: 'Audit', icon: FileSearch },
 ];
 
@@ -70,7 +76,7 @@ export function AdminNav({ role, fullName }: { role: Role; fullName: string }) {
         </div>
       </header>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card lg:hidden">
         {links.map((l) => (
           <Link
             key={l.href}

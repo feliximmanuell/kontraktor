@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { uploadReceipt } from '@/lib/actions/purchases';
+import { uploadReceipt, setReceiptStatus } from '@/lib/actions/purchases';
 import {
   Dialog,
   DialogContent,
@@ -16,9 +16,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Loader2, UploadCloud } from 'lucide-react';
+import { Loader2, UploadCloud, XCircle } from 'lucide-react';
 
-export function UploadReceiptDialog({ purchaseId }: { purchaseId: string }) {
+export function UploadReceiptDialog({
+  purchaseId,
+  hasReceipt,
+}: {
+  purchaseId: string;
+  hasReceipt?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -46,19 +52,33 @@ export function UploadReceiptDialog({ purchaseId }: { purchaseId: string }) {
     router.refresh();
   }
 
+  async function markPending() {
+    setBusy(true);
+    const res = await setReceiptStatus(purchaseId, 'pending');
+    setBusy(false);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success('Bon ditandai belum diterima.');
+    setOpen(false);
+    router.refresh();
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <UploadCloud />
-          Upload Bon
+          {hasReceipt ? 'Ubah Bon' : 'Upload Bon'}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Foto Bon / Nota</DialogTitle>
+          <DialogTitle>{hasReceipt ? 'Ubah Foto Bon / Nota' : 'Upload Foto Bon / Nota'}</DialogTitle>
           <DialogDescription>
-            Foto bon akan ditandai sebagai sudah diterima.
+            Unggah bon baru akan mengganti bon lama dan menandai sebagai sudah
+            diterima.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -74,8 +94,20 @@ export function UploadReceiptDialog({ purchaseId }: { purchaseId: string }) {
               {file ? `File terpilih: ${file.name}` : 'JPG, PNG, WEBP, atau PDF (maks 5MB)'}
             </p>
           </div>
-          <DialogFooter>
-            <Button type="submit" disabled={busy}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+            {hasReceipt ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={markPending}
+                disabled={busy}
+              >
+                {busy ? <Loader2 className="animate-spin" /> : <XCircle />}
+                Tandai Belum Diterima
+              </Button>
+            ) : null}
+            <Button type="submit" disabled={busy || !file}>
               {busy ? <Loader2 className="animate-spin" /> : <UploadCloud />}
               {busy ? 'Mengunggah...' : 'Simpan Bon'}
             </Button>

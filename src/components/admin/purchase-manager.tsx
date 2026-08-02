@@ -6,9 +6,10 @@ import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { createPurchase } from '@/lib/actions/purchases';
+import { createPurchase, deletePurchase } from '@/lib/actions/purchases';
 import { ReceiptStatusBadge } from '@/components/status-badges';
 import { UploadReceiptDialog } from '@/components/admin/upload-receipt-dialog';
+import { MaterialAutocomplete } from '@/components/material-autocomplete';
 import { EmptyState } from '@/components/empty-state';
 import {
   Card,
@@ -27,11 +28,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Loader2, Plus, Save, Trash2, UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PurchaseJoined } from '@/lib/types';
 import { formatIDR, formatDateTime } from '@/lib/format';
-
 interface ApprovedRequestOption {
   id: string;
   project_name: string;
@@ -69,6 +77,8 @@ export function PurchaseManager({
   const router = useRouter();
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PurchaseJoined | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const {
     register,
@@ -134,6 +144,20 @@ export function PurchaseManager({
     router.refresh();
   }
 
+  async function onDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    const res = await deletePurchase(deleteTarget.id);
+    setDeleteBusy(false);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success('Pembelian dihapus. Stok otomatis dikurangi.');
+    setDeleteTarget(null);
+    router.refresh();
+  }
+
   const receiptFilters = [
     { value: 'all' as const, label: 'Semua' },
     { value: 'pending' as const, label: 'Bon Belum Diterima' },
@@ -142,9 +166,52 @@ export function PurchaseManager({
   const [receiptFilter, setReceiptFilter] =
     useState<(typeof receiptFilters)[number]['value']>('all');
 
-  const filteredPurchases = purchases.filter((p) =>
-    receiptFilter === 'all' ? true : p.receipt_status === receiptFilter
+  const paymentFilters = [
+    { value: 'all' as const, label: 'Semua' },
+    { value: 'paid' as const, label: 'Sudah Dibayar' },
+    { value: 'unpaid' as const, label: 'Belum Dibayar' },
+  ];
+  const [paymentFilter, setPaymentFilter] =
+    useState<(typeof paymentFilters)[number]['value']>('all');
+
+  const sortOptions = [
+    { value: 'newest', label: 'Tanggal Terbaru' },
+    { value: 'oldest', label: 'Tanggal Terlama' },
+    { value: 'project_az', label: 'Proyek (A-Z)' },
+    { value: 'project_za', label: 'Proyek (Z-A)' },
+    { value: 'unpaid_first', label: 'Belum Dibayar Dulu' },
+    { value: 'paid_first', label: 'Sudah Dibayar Dulu' },
+  ];
+  const [sortKey, setSortKey] = useState<string>('newest');
+
+  const visiblePurchases = purchases.filter(
+    (p) =>
+      (receiptFilter === 'all' ? true : p.receipt_status === receiptFilter) &&
+      (paymentFilter === 'all'
+        ? true
+        : paymentFilter === 'paid'
+          ? p.paid
+          : !p.paid)
   );
+
+  const sortedPurchases = [...visiblePurchases].sort((a, b) => {
+    switch (sortKey) {
+      case 'oldest':
+        return a.purchased_at.localeCompare(b.purchased_at);
+      case 'project_az':
+        return a.project_name.localeCompare(b.project_name);
+      case 'project_za':
+        return b.project_name.localeCompare(a.project_name);
+      case 'unpaid_first':
+        return Number(a.paid) - Number(b.paid) ||
+          b.purchased_at.localeCompare(a.purchased_at);
+      case 'paid_first':
+        return Number(b.paid) - Number(a.paid) ||
+          b.purchased_at.localeCompare(a.purchased_at);
+      default:
+        return b.purchased_at.localeCompare(a.purchased_at);
+    }
+  });
 
   return (
     <div className="space-y-6">
@@ -295,9 +362,16 @@ export function PurchaseManager({
                     </div>
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div className="space-y-1 sm:col-span-1">
-                        <Input
-                          placeholder="Nama material"
-                          {...register(`items.${index}.materialName` as const)}
+                        <Controller
+                          control={control}
+                          name={`items.${index}.materialName`}
+                          render={({ field }) => (
+                            <MaterialAutocomplete
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Nama material"
+                            />
+                          )}
                         />
                         {errors.items?.[index]?.materialName ? (
                           <p className="text-xs text-destructive">
@@ -369,30 +443,60 @@ export function PurchaseManager({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Daftar Pembelian</h2>
-          <div className="flex rounded-lg border bg-card p-1">
-            {receiptFilters.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setReceiptFilter(f.value)}
-                className={cn(
-                  'rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                  receiptFilter === f.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value)}
+              className="h-9 rounded-lg border bg-card px-2 text-sm outline-none"
+            >
+              {sortOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex rounded-lg border bg-card p-1">
+              {paymentFilters.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setPaymentFilter(f.value)}
+                  className={cn(
+                    'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                    paymentFilter === f.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex rounded-lg border bg-card p-1">
+              {receiptFilters.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setReceiptFilter(f.value)}
+                  className={cn(
+                    'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                    receiptFilter === f.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {filteredPurchases.length === 0 ? (
+        {sortedPurchases.length === 0 ? (
           <EmptyState title="Tidak ada pembelian" />
         ) : (
           <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[820px] text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Tanggal</th>
@@ -401,12 +505,13 @@ export function PurchaseManager({
                   <th className="px-4 py-3 font-medium">Toko</th>
                   <th className="px-4 py-3 text-right font-medium">Qty</th>
                   <th className="px-4 py-3 text-right font-medium">Total</th>
+                  <th className="px-4 py-3 font-medium">Pembayaran</th>
                   <th className="px-4 py-3 font-medium">Bon</th>
                   <th className="px-4 py-3 font-medium">Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredPurchases.map((p) => (
+                {sortedPurchases.map((p) => (
                   <tr key={p.id} className="border-b last:border-0">
                     <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                       {formatDateTime(p.purchased_at)}
@@ -419,6 +524,18 @@ export function PurchaseManager({
                     <td className="px-4 py-3 text-right">{p.qty}</td>
                     <td className="px-4 py-3 text-right font-semibold">
                       {formatIDR(p.total_price)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold',
+                          p.paid
+                            ? 'border-green-300 bg-green-50 text-green-700'
+                            : 'border-amber-300 bg-amber-50 text-amber-700'
+                        )}
+                      >
+                        {p.paid ? 'Sudah Dibayar' : 'Belum Dibayar'}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <ReceiptStatusBadge status={p.receipt_status} />
@@ -436,8 +553,22 @@ export function PurchaseManager({
                             Lihat Bon
                           </a>
                         ) : null}
-                        {p.receipt_status === 'pending' && isAdmin ? (
-                          <UploadReceiptDialog purchaseId={p.id} />
+                        {isAdmin ? (
+                          <>
+                            <UploadReceiptDialog
+                              purchaseId={p.id}
+                              hasReceipt={p.receipt_status === 'received'}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeleteTarget(p)}
+                            >
+                              <Trash2 className="size-4" />
+                              Hapus
+                            </Button>
+                          </>
                         ) : null}
                       </div>
                     </td>
@@ -448,6 +579,28 @@ export function PurchaseManager({
           </div>
         )}
       </div>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Pembelian?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget
+                ? `Hapus "${deleteTarget.material_name}" (${deleteTarget.qty}) di ${deleteTarget.project_name}? Stok akan dikurangi.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={onDelete} disabled={deleteBusy}>
+              {deleteBusy ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

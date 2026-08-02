@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { createMaterialRequest } from '@/lib/actions/requests';
+import { MaterialAutocomplete } from '@/components/material-autocomplete';
 import { CheckCircle2, Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +36,7 @@ export default function RequestPage() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -99,13 +101,22 @@ export default function RequestPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="materialName">Nama Material / Barang</Label>
-              <Input
-                id="materialName"
-                placeholder="Cth: Semen 50kg, Besi Beton 8mm, Cat Tembok"
-                className="h-12 text-base"
-                {...register('materialName')}
+              <Label>Nama Material / Barang</Label>
+              <Controller
+                control={control}
+                name="materialName"
+                render={({ field }) => (
+                  <MaterialAutocomplete
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Cth: Semen 50kg, Besi Beton 8mm, Cat Tembok"
+                  />
+                )}
               />
+              <p className="text-xs text-muted-foreground">
+                Ketik lalu pilih dari daftar stok yang tersedia, atau ketik nama
+                baru untuk material yang belum ada.
+              </p>
               {errors.materialName ? (
                 <p className="text-xs text-destructive">{errors.materialName.message}</p>
               ) : null}

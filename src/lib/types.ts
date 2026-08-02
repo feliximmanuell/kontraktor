@@ -69,6 +69,43 @@ export interface MaterialUsage {
   used_at: string;
 }
 
+export interface MaterialStock {
+  id: string;
+  material_name: string;
+  current_stock: number;
+  unit: string;
+  updated_at: string;
+}
+
+export type PaymentType = 'purchase' | 'manual';
+
+export interface Payment {
+  id: string;
+  payment_type: PaymentType;
+  purchase_id: string | null;
+  description: string;
+  project_name: string;
+  material_name: string | null;
+  amount: number;
+  paid_at: string;
+  paid_by: string | null;
+  created_at: string;
+}
+
+export interface PaymentJoined extends Payment {
+  paid_by_name: string;
+}
+
+export interface UnpaidPurchase {
+  id: string;
+  project_name: string;
+  material_name: string;
+  store_name: string;
+  qty: string;
+  total_price: number;
+  purchased_at: string;
+}
+
 // ---- Tipe gabungan (join) yang dipakai di UI ----
 
 export interface RequestJoined {
@@ -92,6 +129,7 @@ export interface PurchaseJoined {
   store_name: string;
   qty: string;
   total_price: number;
+  paid: boolean;
   receipt_status: ReceiptStatus;
   receipt_image_url: string | null;
   purchased_by: string | null;
