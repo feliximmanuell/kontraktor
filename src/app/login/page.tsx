@@ -65,8 +65,15 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-muted/30 px-4 py-10">
-      <Card className="w-full max-w-md">
-        <CardHeader className="items-center text-center">
+      <div className="w-full max-w-md">
+        <Link
+          href="/"
+          className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <span aria-hidden="true">&larr;</span> Pilihan Portal
+        </Link>
+        <Card>
+          <CardHeader className="items-center text-center">
           <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <HardHat className="size-6" />
           </div>
@@ -120,7 +127,8 @@ export default function LoginPage() {
             jika belum punya akun.
           </p>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }
