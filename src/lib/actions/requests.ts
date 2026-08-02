@@ -9,60 +9,47 @@ export type ActionResponse = {
 };
 
 /**
- * Tukang/Mandor mengajukan permintaan material.
- * Trigger `flag_duplicate_request` otomatis menandai is_flagged_duplicate
- * jika stok proyek masih tersisa.
+ * Pengajuan material PUBLIK — tanpa perlu akun.
+ * Nama material bebas (free text). Jika nama cocok dengan master material,
+ * material_id otomatis diisi sehingga cek stok & deteksi pembelian ganda tetap jalan.
  */
 export async function createMaterialRequest(
   formData: FormData
-): Promise<ActionResponse & { is_flagged_duplicate?: boolean; current_stock?: number }> {
+): Promise<ActionResponse> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: 'Harap login terlebih dahulu.' };
 
   const projectId = String(formData.get('projectId') ?? '');
-  const materialId = String(formData.get('materialId') ?? '');
+  const materialName = String(formData.get('materialName') ?? '').trim();
   const requestedQty = Number(formData.get('requestedQty'));
   const notes = String(formData.get('notes') ?? '').trim();
 
-  if (!projectId || !materialId || !(requestedQty > 0)) {
-    return { error: 'Data pengajuan tidak lengkap. Pilih proyek, material, dan jumlah yang valid.' };
+  if (!projectId || !materialName || !(requestedQty > 0)) {
+    return { error: 'Data pengajuan tidak lengkap. Isi proyek, nama material, dan jumlah yang valid.' };
   }
 
-  // Cek sisa stok untuk menampilkan peringatan seketika di layar tukang.
-  const { data: stock } = await supabase
-    .from('project_stocks')
-    .select('current_stock')
-    .eq('project_id', projectId)
-    .eq('material_id', materialId)
+  // Coba samakan dengan master material (ignore-case) agar terhubung ke stok.
+  const { data: matched } = await supabase
+    .from('materials')
+    .select('id')
+    .ilike('name', materialName)
+    .limit(1)
     .maybeSingle();
-  const currentStock = Number(stock?.current_stock ?? 0);
 
-  const { data, error } = await supabase
-    .from('material_requests')
-    .insert({
-      project_id: projectId,
-      material_id: materialId,
-      requester_id: user.id,
-      requested_qty: requestedQty,
-      notes: notes || null,
-    })
-    .select('id, is_flagged_duplicate')
-    .single();
+  const { error } = await supabase.from('material_requests').insert({
+    project_id: projectId,
+    material_id: matched?.id ?? null,
+    material_name: materialName,
+    requester_id: null,
+    requested_qty: requestedQty,
+    notes: notes || null,
+  });
 
   if (error) return { error: error.message };
 
-  revalidatePath('/request/history');
   revalidatePath('/admin/requests');
   revalidatePath('/admin/dashboard');
 
-  return {
-    success: true,
-    is_flagged_duplicate: data.is_flagged_duplicate ?? currentStock > 0,
-    current_stock: currentStock,
-  };
+  return { success: true };
 }
 
 /** Setujui / tolak pengajuan (khusus admin). */

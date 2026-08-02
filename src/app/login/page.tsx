@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -69,9 +70,9 @@ export default function LoginPage() {
           <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <HardHat className="size-6" />
           </div>
-          <CardTitle className="text-xl">Masuk ke Sistem</CardTitle>
+          <CardTitle className="text-xl">Masuk Portal Admin</CardTitle>
           <CardDescription>
-            Sistem Rekap & Audit Material Proyek Kontraktor
+            Verifikasi pengajuan, rekap pembelian, dan audit material proyek.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -108,6 +109,13 @@ export default function LoginPage() {
             </Button>
           </form>
           <p className="mt-6 text-center text-xs text-muted-foreground">
+            Ingin mengajukan material?{' '}
+            <Link href="/request" className="font-medium text-primary hover:underline">
+              Ajukan tanpa login
+            </Link>
+            .
+          </p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
             Akun dibuat oleh Admin/Bos melalui Supabase Dashboard. Hubungi admin
             jika belum punya akun.
           </p>

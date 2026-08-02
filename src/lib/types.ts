@@ -38,8 +38,9 @@ export interface ProjectStock {
 export interface MaterialRequest {
   id: string;
   project_id: string;
-  requester_id: string;
-  material_id: string;
+  requester_id: string | null;
+  material_id: string | null;
+  material_name: string;
   requested_qty: number;
   notes: string | null;
   status: RequestStatus;
@@ -77,8 +78,9 @@ export interface MaterialUsage {
 export interface RequestJoined {
   id: string;
   project_id: string;
-  requester_id: string;
-  material_id: string;
+  requester_id: string | null;
+  material_id: string | null;
+  material_name: string;
   requested_qty: number;
   notes: string | null;
   status: RequestStatus;

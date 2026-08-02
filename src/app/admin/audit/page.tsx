@@ -19,7 +19,7 @@ export default async function AdminAuditPage({
       supabase
         .from('material_requests')
         .select(
-          'id, requested_qty, notes, status, is_flagged_duplicate, created_at, project_id, requester_id, materials(name, unit)'
+          'id, requested_qty, notes, status, is_flagged_duplicate, created_at, project_id, requester_id, material_name, materials(name, unit)'
         )
         .order('created_at', { ascending: false }),
       supabase
@@ -43,7 +43,11 @@ export default async function AdminAuditPage({
   }[];
 
   const requesterIds = Array.from(
-    new Set((requests ?? []).map((r) => (r as { requester_id: string }).requester_id))
+    new Set(
+      (requests ?? [])
+        .map((r) => (r as { requester_id: string | null }).requester_id)
+        .filter(Boolean) as string[]
+    )
   );
   const { data: profiles } = requesterIds.length
     ? await supabase.from('users_profile').select('user_id, full_name').in('user_id', requesterIds)
@@ -75,7 +79,8 @@ export default async function AdminAuditPage({
       status: string;
       is_flagged_duplicate: boolean;
       created_at: string;
-      requester_id: string;
+      requester_id: string | null;
+      material_name: string;
       materials: { name: string; unit: string } | null;
     };
     if (!grouped[row.project_id]) {
@@ -88,7 +93,7 @@ export default async function AdminAuditPage({
     }
     grouped[row.project_id].requests.push({
       ...row,
-      requester_name: nameMap.get(row.requester_id) ?? '-',
+      requester_name: row.requester_id ? nameMap.get(row.requester_id) ?? '-' : 'Publik',
     });
   }
 
@@ -205,13 +210,15 @@ export default async function AdminAuditPage({
                         is_flagged_duplicate: boolean;
                         created_at: string;
                         requester_name: string;
+                        material_name: string;
                         materials: { name: string; unit: string } | null;
                       };
                       return (
                         <div key={row.id} className="rounded-lg border p-3 text-sm">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-medium">
-                              {row.materials?.name} ({row.requested_qty} {row.materials?.unit})
+                              {row.materials?.name ?? row.material_name} (
+                              {row.requested_qty} {row.materials?.unit})
                             </span>
                             <RequestStatusBadge
                               status={row.status as 'pending' | 'approved' | 'rejected'}

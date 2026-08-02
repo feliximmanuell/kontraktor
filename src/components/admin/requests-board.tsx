@@ -77,7 +77,7 @@ export function RequestsBoard({
                       ) : null}
                     </div>
                     <p className="font-semibold">
-                      {req.materials?.name}{' '}
+                      {req.materials?.name ?? req.material_name}{' '}
                       <span className="font-normal text-muted-foreground">
                         ({req.requested_qty} {req.materials?.unit})
                       </span>

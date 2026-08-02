@@ -30,11 +30,11 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isLogin = path.startsWith('/login');
-  const isMandor = path.startsWith('/request');
   const isAdmin = path.startsWith('/admin');
 
   if (!user) {
-    if (isMandor || isAdmin) {
+    // /request publik, tidak butuh login.
+    if (isAdmin) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       url.searchParams.set('next', path);
@@ -54,13 +54,6 @@ export async function updateSession(request: NextRequest) {
   if (isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = role === 'tukang' ? '/request' : '/admin/dashboard';
-    url.search = '';
-    return NextResponse.redirect(url);
-  }
-
-  if (isMandor && role !== 'tukang') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/admin/dashboard';
     url.search = '';
     return NextResponse.redirect(url);
   }

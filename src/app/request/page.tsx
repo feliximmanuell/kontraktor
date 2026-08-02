@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { createMaterialRequest } from '@/lib/actions/requests';
-import { AlertTriangle, CheckCircle2, Loader2, Send } from 'lucide-react';
+import { CheckCircle2, Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -32,15 +32,10 @@ interface Project {
   name: string;
   location: string | null;
 }
-interface Material {
-  id: string;
-  name: string;
-  unit: string;
-}
 
 const schema = z.object({
   projectId: z.string().min(1, 'Pilih proyek terlebih dahulu'),
-  materialId: z.string().min(1, 'Pilih material terlebih dahulu'),
+  materialName: z.string().min(1, 'Nama material wajib diisi'),
   requestedQty: z.number().min(0.01, 'Jumlah harus lebih dari 0'),
   notes: z.string().max(500, 'Catatan maksimal 500 karakter').optional(),
 });
@@ -50,9 +45,8 @@ type FormValues = z.infer<typeof schema>;
 export default function RequestPage() {
   const supabase = useMemo(() => createClient(), []);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [warning, setWarning] = useState<{ current_stock: number; unit: string } | null>(null);
+  const [done, setDone] = useState(false);
 
   const {
     register,
@@ -62,23 +56,19 @@ export default function RequestPage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { projectId: '', materialId: '', requestedQty: undefined, notes: '' },
+    defaultValues: { projectId: '', materialName: '', requestedQty: undefined, notes: '' },
   });
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const [pRes, mRes] = await Promise.all([
-        supabase
-          .from('projects')
-          .select('id, name, location')
-          .eq('status', 'active')
-          .order('name'),
-        supabase.from('materials').select('id, name, unit').order('name'),
-      ]);
+      const { data } = await supabase
+        .from('projects')
+        .select('id, name, location')
+        .eq('status', 'active')
+        .order('name');
       if (!mounted) return;
-      if (pRes.data) setProjects(pRes.data as unknown as Project[]);
-      if (mRes.data) setMaterials(mRes.data as unknown as Material[]);
+      if (data) setProjects(data as unknown as Project[]);
     }
     load();
     return () => {
@@ -88,11 +78,11 @@ export default function RequestPage() {
 
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
-    setWarning(null);
+    setDone(false);
 
     const formData = new FormData();
     formData.set('projectId', values.projectId);
-    formData.set('materialId', values.materialId);
+    formData.set('materialName', values.materialName);
     formData.set('requestedQty', String(values.requestedQty));
     formData.set('notes', values.notes ?? '');
 
@@ -105,36 +95,21 @@ export default function RequestPage() {
     }
 
     toast.success('Pengajuan berhasil dikirim ke Admin!');
-    const unit = materials.find((m) => m.id === values.materialId)?.unit ?? '';
-    if (res.is_flagged_duplicate) {
-      setWarning({ current_stock: res.current_stock ?? 0, unit });
-    }
     reset();
+    setDone(true);
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto w-full max-w-lg space-y-4 px-4 py-6">
       <Card>
         <CardHeader>
-          <CardTitle>Minta Material</CardTitle>
+          <CardTitle>Pengajuan Pembelian Material</CardTitle>
           <CardDescription>
-            Ajukan kebutuhan material baru dari lapangan dengan cepat.
+            Ajukan kebutuhan material untuk proyek. Tanpa login, data langsung
+            masuk ke Admin untuk diproses.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {warning && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              <p>
-                Peringatan: Stok material ini di proyek masih tersisa{' '}
-                <strong>
-                  {warning.current_stock} {warning.unit}
-                </strong>
-                . Pastikan benar-benar butuh sebelum mengajukan.
-              </p>
-            </div>
-          )}
-
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label>Pilih Proyek</Label>
@@ -163,27 +138,15 @@ export default function RequestPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Pilih Material / Barang</Label>
-              <Controller
-                control={control}
-                name="materialId"
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value || undefined}>
-                    <SelectTrigger className="h-12 w-full">
-                      <SelectValue placeholder="-- Pilih Barang --" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {materials.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name} ({m.unit})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+              <Label htmlFor="materialName">Nama Material / Barang</Label>
+              <Input
+                id="materialName"
+                placeholder="Cth: Semen 50kg, Besi Beton 8mm, Cat Tembok"
+                className="h-12 text-base"
+                {...register('materialName')}
               />
-              {errors.materialId ? (
-                <p className="text-xs text-destructive">{errors.materialId.message}</p>
+              {errors.materialName ? (
+                <p className="text-xs text-destructive">{errors.materialName.message}</p>
               ) : null}
             </div>
 
@@ -230,9 +193,9 @@ export default function RequestPage() {
         </CardContent>
       </Card>
 
-      {warning ? (
+      {done ? (
         <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800">
-          <CheckCircle2 className="size-4" />
+          <CheckCircle2 className="size-4 shrink-0" />
           Pengajuan tercatat. Admin akan memverifikasi permintaan Anda.
         </div>
       ) : null}

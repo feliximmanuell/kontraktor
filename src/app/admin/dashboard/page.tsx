@@ -20,7 +20,7 @@ export default async function AdminDashboardPage() {
       supabase
         .from('material_requests')
         .select(
-          'id, requested_qty, created_at, project_id, material_id, is_flagged_duplicate, projects(name), materials(name, unit)'
+          'id, requested_qty, created_at, project_id, material_id, material_name, is_flagged_duplicate, projects(name), materials(name, unit)'
         )
         .eq('status', 'pending')
         .eq('is_flagged_duplicate', true)
@@ -68,11 +68,18 @@ export default async function AdminDashboardPage() {
       requested_qty: number;
       created_at: string;
       project_id: string;
-      material_id: string;
+      material_id: string | null;
+      material_name: string;
       projects: { name: string } | null;
       materials: { name: string; unit: string } | null;
     };
-    return { ...row, current_stock: stockMap.get(`${row.project_id}:${row.material_id}`) ?? 0 };
+    return {
+      ...row,
+      current_stock:
+        row.material_id && row.project_id
+          ? stockMap.get(`${row.project_id}:${row.material_id}`) ?? 0
+          : 0,
+    };
   });
 
   const kpis = [
@@ -149,7 +156,7 @@ export default async function AdminDashboardPage() {
                 <div key={a.id} className="space-y-2 px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-medium">
-                      {a.materials?.name}{' '}
+                      {a.materials?.name ?? a.material_name}{' '}
                       <span className="text-muted-foreground">
                         ({a.requested_qty} {a.materials?.unit})
                       </span>

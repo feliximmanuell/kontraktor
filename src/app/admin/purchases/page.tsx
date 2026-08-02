@@ -19,7 +19,7 @@ export default async function AdminPurchasesPage() {
       supabase
         .from('material_requests')
         .select(
-          'id, project_id, material_id, requested_qty, status, projects(name), materials(name, unit)'
+          'id, project_id, material_id, material_name, requested_qty, status, projects(name), materials(name, unit)'
         )
         .eq('status', 'approved'),
       supabase.from('projects').select('id, name').eq('status', 'active').order('name'),
@@ -36,7 +36,8 @@ export default async function AdminPurchasesPage() {
       const row = r as unknown as {
         id: string;
         project_id: string;
-        material_id: string;
+        material_id: string | null;
+        material_name: string;
         requested_qty: number;
         projects: { name: string } | null;
         materials: { name: string; unit: string } | null;
@@ -46,7 +47,7 @@ export default async function AdminPurchasesPage() {
         project_id: row.project_id,
         material_id: row.material_id,
         requested_qty: row.requested_qty,
-        material: row.materials?.name ?? '',
+        material: row.materials?.name ?? row.material_name,
         unit: row.materials?.unit ?? '',
         project: row.projects?.name ?? '',
       };

@@ -35,7 +35,7 @@ import { formatIDR, formatDateTime } from '@/lib/format';
 interface ApprovedRequestOption {
   id: string;
   project_id: string;
-  material_id: string;
+  material_id: string | null;
   requested_qty: number;
   material: string;
   unit: string;
@@ -104,12 +104,15 @@ export function PurchaseManager({
   const mode = useWatch({ control, name: 'mode' });
   const requestId = useWatch({ control, name: 'requestId' });
 
+  const selectedRequest = requests.find((r) => r.id === requestId);
+  const lockMaterial = mode === 'request' && !!selectedRequest?.material_id;
+
   useEffect(() => {
     if (mode === 'request' && requestId) {
       const req = requests.find((r) => r.id === requestId);
       if (req) {
         setValue('projectId', req.project_id, { shouldValidate: true });
-        setValue('materialId', req.material_id, { shouldValidate: true });
+        setValue('materialId', req.material_id ?? '', { shouldValidate: true });
         setValue('qty', req.requested_qty, { shouldValidate: true });
       }
     }
@@ -222,58 +225,67 @@ export function PurchaseManager({
               ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
-                {mode === 'manual' ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Proyek</Label>
-                      <Controller
-                        control={control}
-                        name="projectId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="-- Pilih Proyek --" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {projects.map((p) => (
-                                <SelectItem key={p.id} value={p.id}>
-                                  {p.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                      {errors.projectId ? (
-                        <p className="text-xs text-destructive">{errors.projectId.message}</p>
-                      ) : null}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Material</Label>
-                      <Controller
-                        control={control}
-                        name="materialId"
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="-- Pilih Material --" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {materials.map((m) => (
-                                <SelectItem key={m.id} value={m.id}>
-                                  {m.name} ({m.unit})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                      {errors.materialId ? (
-                        <p className="text-xs text-destructive">{errors.materialId.message}</p>
-                      ) : null}
-                    </div>
-                  </>
-                ) : null}
+                <div className="space-y-2">
+                  <Label>Proyek</Label>
+                  <Controller
+                    control={control}
+                    name="projectId"
+                    render={({ field }) => (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || undefined}
+                        disabled={mode === 'request'}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="-- Pilih Proyek --" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {projects.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.projectId ? (
+                    <p className="text-xs text-destructive">{errors.projectId.message}</p>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <Label>Material</Label>
+                  <Controller
+                    control={control}
+                    name="materialId"
+                    render={({ field }) => (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || undefined}
+                        disabled={lockMaterial}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="-- Pilih Material --" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {materials.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name} ({m.unit})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.materialId ? (
+                    <p className="text-xs text-destructive">{errors.materialId.message}</p>
+                  ) : null}
+                  {mode === 'request' && selectedRequest && !selectedRequest.material_id ? (
+                    <p className="text-xs text-muted-foreground">
+                      Pengajuan ini tidak terhubung ke material master — pilih material yang sesuai.
+                    </p>
+                  ) : null}
+                </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">

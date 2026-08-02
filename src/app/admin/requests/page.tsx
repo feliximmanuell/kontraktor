@@ -10,13 +10,15 @@ export default async function AdminRequestsPage() {
   const { data } = await supabase
     .from('material_requests')
     .select(
-      'id, project_id, requester_id, material_id, requested_qty, notes, status, is_flagged_duplicate, created_at, projects(name, location), materials(name, unit)'
+      'id, project_id, requester_id, material_id, material_name, requested_qty, notes, status, is_flagged_duplicate, created_at, projects(name, location), materials(name, unit)'
     )
     .order('created_at', { ascending: false });
 
   const rows = data ?? [];
 
-  const requesterIds = Array.from(new Set(rows.map((r) => r.requester_id)));
+  const requesterIds = Array.from(
+    new Set(rows.map((r) => (r as { requester_id: string | null }).requester_id).filter(Boolean) as string[])
+  );
   const { data: profiles } = requesterIds.length
     ? await supabase
         .from('users_profile')
@@ -41,8 +43,9 @@ export default async function AdminRequestsPage() {
     const row = r as unknown as {
       id: string;
       project_id: string;
-      requester_id: string;
-      material_id: string;
+      requester_id: string | null;
+      material_id: string | null;
+      material_name: string;
       requested_qty: number;
       notes: string | null;
       status: RequestJoined['status'];
@@ -56,6 +59,7 @@ export default async function AdminRequestsPage() {
       project_id: row.project_id,
       requester_id: row.requester_id,
       material_id: row.material_id,
+      material_name: row.material_name,
       requested_qty: row.requested_qty,
       notes: row.notes,
       status: row.status,
@@ -63,8 +67,11 @@ export default async function AdminRequestsPage() {
       created_at: row.created_at,
       projects: row.projects,
       materials: row.materials,
-      requester_name: nameMap.get(row.requester_id) ?? 'Pengguna',
-      current_stock: stockMap.get(`${row.project_id}:${row.material_id}`) ?? 0,
+      requester_name: row.requester_id ? nameMap.get(row.requester_id) ?? 'Pengguna' : 'Publik',
+      current_stock:
+        row.material_id && row.project_id
+          ? stockMap.get(`${row.project_id}:${row.material_id}`) ?? 0
+          : 0,
     };
   });
 
