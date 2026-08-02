@@ -26,29 +26,29 @@ async function requireAdmin() {
 }
 
 /**
- * Catat pemakaian material di lapangan.
- * Trigger `reduce_stock_on_usage` otomatis mengurangi stok proyek
- * dan menolak jika stok tidak mencukupi.
+ * Catat pemakaian material di lapangan. Semua field bebas teks.
  */
 export async function createMaterialUsage(formData: FormData): Promise<ActionResponse> {
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 
-  const projectId = String(formData.get('projectId') ?? '');
-  const materialId = String(formData.get('materialId') ?? '');
-  const qtyUsed = Number(formData.get('qtyUsed'));
+  const projectName = String(formData.get('projectName') ?? '').trim();
+  const materialName = String(formData.get('materialName') ?? '').trim();
+  const qtyUsed = String(formData.get('qtyUsed') ?? '').trim();
   const usedFor = String(formData.get('usedFor') ?? '').trim();
 
-  if (!projectId || !materialId || !(qtyUsed > 0)) {
-    return { error: 'Pilih proyek, material, dan jumlah yang valid.' };
+  if (!projectName || !materialName || !qtyUsed) {
+    return { error: 'Isi nama proyek, nama material, dan jumlah pemakaian.' };
   }
   if (usedFor.length < 3) {
     return { error: 'Detail pemakaian (digunakan untuk apa/di mana) wajib diisi.' };
   }
 
   const { error } = await ctx.supabase.from('material_usages').insert({
-    project_id: projectId,
-    material_id: materialId,
+    project_id: null,
+    project_name: projectName,
+    material_id: null,
+    material_name: materialName,
     qty_used: qtyUsed,
     used_for: usedFor,
     logged_by: ctx.user.id,
@@ -57,7 +57,6 @@ export async function createMaterialUsage(formData: FormData): Promise<ActionRes
   if (error) return { error: error.message };
 
   revalidatePath('/admin/usage');
-  revalidatePath('/admin/inventory');
   revalidatePath('/admin/dashboard');
   revalidatePath('/admin/audit');
   return { success: true };

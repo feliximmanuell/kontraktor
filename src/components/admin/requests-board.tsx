@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { setRequestStatus } from '@/lib/actions/requests';
 import { RequestStatusBadge } from '@/components/status-badges';
-import { StockAlertBadge } from '@/components/stock-alert-badge';
 import { EmptyState } from '@/components/empty-state';
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -42,7 +41,7 @@ export function RequestsBoard({
     <div className="space-y-6">
       <PageHeader
         title="Verifikasi Pengajuan"
-        description="Setujui atau tolak pengajuan material dari tukang."
+        description="Setujui atau tolak pengajuan material."
       />
 
       <Tabs defaultValue="pending">
@@ -69,21 +68,15 @@ export function RequestsBoard({
                   >
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <RequestStatusBadge status={req.status} />
-                      {req.is_flagged_duplicate ? (
-                        <StockAlertBadge
-                          currentStock={req.current_stock}
-                          unit={req.materials?.unit ?? ''}
-                        />
-                      ) : null}
                     </div>
                     <p className="font-semibold">
-                      {req.materials?.name ?? req.material_name}{' '}
+                      {req.material_name}{' '}
                       <span className="font-normal text-muted-foreground">
-                        ({req.requested_qty} {req.materials?.unit})
+                        ({req.requested_qty})
                       </span>
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Proyek: <span className="font-medium">{req.projects?.name}</span>
+                      Proyek: <span className="font-medium">{req.project_name}</span>
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Diminta oleh: <span className="font-medium">{req.requester_name}</span>
@@ -105,11 +98,7 @@ export function RequestsBoard({
                           onClick={() => handleStatus(req.id, 'rejected')}
                           disabled={busyId === req.id}
                         >
-                          {busyId === req.id ? (
-                            <Loader2 className="animate-spin" />
-                          ) : (
-                            <X />
-                          )}
+                          {busyId === req.id ? <Loader2 className="animate-spin" /> : <X />}
                           Tolak
                         </Button>
                         <Button
@@ -117,11 +106,7 @@ export function RequestsBoard({
                           onClick={() => handleStatus(req.id, 'approved')}
                           disabled={busyId === req.id}
                         >
-                          {busyId === req.id ? (
-                            <Loader2 className="animate-spin" />
-                          ) : (
-                            <Check />
-                          )}
+                          {busyId === req.id ? <Loader2 className="animate-spin" /> : <Check />}
                           Setujui
                         </Button>
                       </div>

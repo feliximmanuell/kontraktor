@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useState } from 'react';
+import Link from 'next/link';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
 import { createMaterialRequest } from '@/lib/actions/requests';
 import { CheckCircle2, Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,71 +19,38 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
-interface Project {
-  id: string;
-  name: string;
-  location: string | null;
-}
 
 const schema = z.object({
-  projectId: z.string().min(1, 'Pilih proyek terlebih dahulu'),
+  projectName: z.string().min(1, 'Nama proyek wajib diisi'),
   materialName: z.string().min(1, 'Nama material wajib diisi'),
-  requestedQty: z.number().min(0.01, 'Jumlah harus lebih dari 0'),
+  requestedQty: z.string().min(1, 'Jumlah wajib diisi'),
   notes: z.string().max(500, 'Catatan maksimal 500 karakter').optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
 
 export default function RequestPage() {
-  const supabase = useMemo(() => createClient(), []);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
   const {
     register,
-    control,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { projectId: '', materialName: '', requestedQty: undefined, notes: '' },
+    defaultValues: { projectName: '', materialName: '', requestedQty: '', notes: '' },
   });
-
-  useEffect(() => {
-    let mounted = true;
-    async function load() {
-      const { data } = await supabase
-        .from('projects')
-        .select('id, name, location')
-        .eq('status', 'active')
-        .order('name');
-      if (!mounted) return;
-      if (data) setProjects(data as unknown as Project[]);
-    }
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [supabase]);
 
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
     setDone(false);
 
     const formData = new FormData();
-    formData.set('projectId', values.projectId);
+    formData.set('projectName', values.projectName);
     formData.set('materialName', values.materialName);
-    formData.set('requestedQty', String(values.requestedQty));
+    formData.set('requestedQty', values.requestedQty);
     formData.set('notes', values.notes ?? '');
 
     const res = await createMaterialRequest(formData);
@@ -101,6 +68,13 @@ export default function RequestPage() {
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-4 px-4 py-6">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <span aria-hidden="true">&larr;</span> Pilihan Portal
+      </Link>
+
       <Card>
         <CardHeader>
           <CardTitle>Pengajuan Pembelian Material</CardTitle>
@@ -112,28 +86,15 @@ export default function RequestPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label>Pilih Proyek</Label>
-              <Controller
-                control={control}
-                name="projectId"
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value || undefined}>
-                    <SelectTrigger className="h-12 w-full">
-                      <SelectValue placeholder="-- Pilih Proyek --" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                          {p.location ? ` - ${p.location}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+              <Label htmlFor="projectName">Nama Proyek</Label>
+              <Input
+                id="projectName"
+                placeholder="Cth: Rumah Pak Haji Jamil, Ruko 2 Lantai"
+                className="h-12 text-base"
+                {...register('projectName')}
               />
-              {errors.projectId ? (
-                <p className="text-xs text-destructive">{errors.projectId.message}</p>
+              {errors.projectName ? (
+                <p className="text-xs text-destructive">{errors.projectName.message}</p>
               ) : null}
             </div>
 
@@ -154,13 +115,9 @@ export default function RequestPage() {
               <Label htmlFor="requestedQty">Jumlah Dibutuhkan</Label>
               <Input
                 id="requestedQty"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="any"
-                placeholder="Cth: 10"
+                placeholder="Cth: 10 sak, 2 truk, 50 batang"
                 className="h-12 text-base"
-                {...register('requestedQty', { valueAsNumber: true })}
+                {...register('requestedQty')}
               />
               {errors.requestedQty ? (
                 <p className="text-xs text-destructive">{errors.requestedQty.message}</p>

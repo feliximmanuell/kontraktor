@@ -26,23 +26,33 @@ async function requireAdmin() {
 }
 
 /**
- * Catat pembelian material. Jika file bon diunggah, status bon = 'received'
- * dan file disimpan ke bucket storage 'receipts'. Trigger `add_stock_on_purchase`
- * otomatis menambah stok proyek.
+ * Catat pembelian material — bisa beberapa barang sekaligus dalam satu transaksi.
+ * Semua field bebas teks (nama proyek, nama material, qty). Total harga per barang
+ * diisi manual. Jika file bon diunggah, status bon = 'received'.
  */
 export async function createPurchase(formData: FormData): Promise<ActionResponse> {
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 
-  const projectId = String(formData.get('projectId') ?? '');
-  const materialId = String(formData.get('materialId') ?? '');
+  const projectName = String(formData.get('projectName') ?? '').trim();
   const storeName = String(formData.get('storeName') ?? '').trim();
-  const qty = Number(formData.get('qty'));
-  const unitPrice = Number(formData.get('unitPrice'));
   const requestId = String(formData.get('requestId') ?? '') || null;
   const file = (formData.get('receipt') as File | null) ?? null;
 
-  if (!projectId || !materialId || !storeName || !(qty > 0) || !(unitPrice >= 0)) {
+  const materialNames = formData.getAll('materialName').map((v) => String(v).trim());
+  const qtys = formData.getAll('qty').map((v) => String(v).trim());
+  const totalPrices = formData.getAll('totalPrice').map((v) => Number(v));
+
+  if (
+    !projectName ||
+    !storeName ||
+    materialNames.length === 0 ||
+    qtys.length !== materialNames.length ||
+    totalPrices.length !== materialNames.length ||
+    materialNames.some((m) => !m) ||
+    qtys.some((q) => !q) ||
+    totalPrices.some((t) => !(t >= 0))
+  ) {
     return { error: 'Data pembelian tidak lengkap. Periksa kembali input Anda.' };
   }
 
@@ -59,24 +69,28 @@ export async function createPurchase(formData: FormData): Promise<ActionResponse
     receiptStatus = 'received';
   }
 
-  const { error } = await ctx.supabase.from('purchases').insert({
-    request_id: requestId,
-    project_id: projectId,
-    material_id: materialId,
+  const rows = materialNames.map((materialName, i) => ({
+    request_id: i === 0 ? requestId : null,
+    project_id: null,
+    project_name: projectName,
+    material_id: null,
+    material_name: materialName,
     store_name: storeName,
-    qty,
-    unit_price: unitPrice,
+    qty: qtys[i],
+    total_price: totalPrices[i],
     receipt_status: receiptStatus,
     receipt_image_url: receiptPath,
     purchased_by: ctx.user.id,
-  });
+  }));
+
+  const { error } = await ctx.supabase.from('purchases').insert(rows);
 
   if (error) return { error: error.message };
 
   revalidatePath('/admin/purchases');
-  revalidatePath('/admin/inventory');
   revalidatePath('/admin/dashboard');
   revalidatePath('/admin/audit');
+  revalidatePath('/admin/requests');
   return { success: true };
 }
 
@@ -106,24 +120,6 @@ export async function uploadReceipt(formData: FormData): Promise<ActionResponse>
   if (error) return { error: error.message };
 
   revalidatePath('/admin/purchases');
-  revalidatePath('/admin/dashboard');
-  return { success: true };
-}
-
-/** Perbaikan/penyesuaian stok manual oleh admin (verifikasi stok). */
-export async function adjustStock(stockId: string, newStock: number): Promise<ActionResponse> {
-  const ctx = await requireAdmin();
-  if (!ctx) return { error: 'Anda tidak punya akses admin.' };
-  if (!(newStock >= 0)) return { error: 'Jumlah stok tidak valid.' };
-
-  const { error } = await ctx.supabase
-    .from('project_stocks')
-    .update({ current_stock: newStock })
-    .eq('id', stockId);
-  if (error) return { error: error.message };
-
-  revalidatePath('/admin/inventory');
-  revalidatePath('/admin/requests');
   revalidatePath('/admin/dashboard');
   return { success: true };
 }

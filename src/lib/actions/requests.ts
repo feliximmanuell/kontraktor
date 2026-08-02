@@ -10,34 +10,26 @@ export type ActionResponse = {
 
 /**
  * Pengajuan material PUBLIK — tanpa perlu akun.
- * Nama material bebas (free text). Jika nama cocok dengan master material,
- * material_id otomatis diisi sehingga cek stok & deteksi pembelian ganda tetap jalan.
+ * Nama proyek, nama material, dan jumlah semuanya bebas (free text).
  */
 export async function createMaterialRequest(
   formData: FormData
 ): Promise<ActionResponse> {
   const supabase = await createClient();
 
-  const projectId = String(formData.get('projectId') ?? '');
+  const projectName = String(formData.get('projectName') ?? '').trim();
   const materialName = String(formData.get('materialName') ?? '').trim();
-  const requestedQty = Number(formData.get('requestedQty'));
+  const requestedQty = String(formData.get('requestedQty') ?? '').trim();
   const notes = String(formData.get('notes') ?? '').trim();
 
-  if (!projectId || !materialName || !(requestedQty > 0)) {
-    return { error: 'Data pengajuan tidak lengkap. Isi proyek, nama material, dan jumlah yang valid.' };
+  if (!projectName || !materialName || !requestedQty) {
+    return { error: 'Data pengajuan tidak lengkap. Isi nama proyek, nama material, dan jumlah.' };
   }
 
-  // Coba samakan dengan master material (ignore-case) agar terhubung ke stok.
-  const { data: matched } = await supabase
-    .from('materials')
-    .select('id')
-    .ilike('name', materialName)
-    .limit(1)
-    .maybeSingle();
-
   const { error } = await supabase.from('material_requests').insert({
-    project_id: projectId,
-    material_id: matched?.id ?? null,
+    project_id: null,
+    project_name: projectName,
+    material_id: null,
     material_name: materialName,
     requester_id: null,
     requested_qty: requestedQty,

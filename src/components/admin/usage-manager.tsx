@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -19,66 +19,46 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Search } from 'lucide-react';
 import type { UsageJoined } from '@/lib/types';
 import { formatDateTime } from '@/lib/format';
 
-interface Option {
-  id: string;
-  name: string;
-  unit?: string;
-}
-
 const schema = z.object({
-  projectId: z.string().min(1, 'Pilih proyek'),
-  materialId: z.string().min(1, 'Pilih material'),
-  qtyUsed: z.number().min(0.01, 'Jumlah harus lebih dari 0'),
+  projectName: z.string().min(1, 'Nama proyek wajib diisi'),
+  materialName: z.string().min(1, 'Nama material wajib diisi'),
+  qtyUsed: z.string().min(1, 'Jumlah wajib diisi'),
   usedFor: z.string().min(3, 'Detail pemakaian wajib diisi'),
 });
 
 type FormValues = z.infer<typeof schema>;
 
 export function UsageManager({
-  projects,
-  materials,
   usages,
   isAdmin,
 }: {
-  projects: Option[];
-  materials: Option[];
   usages: UsageJoined[];
   isAdmin: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-
-  const [filterProject, setFilterProject] = useState('');
-  const [filterMaterial, setFilterMaterial] = useState('');
+  const [query, setQuery] = useState('');
 
   const {
     register,
-    control,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { projectId: '', materialId: '', qtyUsed: undefined, usedFor: '' },
+    defaultValues: { projectName: '', materialName: '', qtyUsed: '', usedFor: '' },
   });
 
   async function onSubmit(values: FormValues) {
     setBusy(true);
     const formData = new FormData();
-    formData.set('projectId', values.projectId);
-    formData.set('materialId', values.materialId);
-    formData.set('qtyUsed', String(values.qtyUsed));
+    formData.set('projectName', values.projectName);
+    formData.set('materialName', values.materialName);
+    formData.set('qtyUsed', values.qtyUsed);
     formData.set('usedFor', values.usedFor);
     const res = await createMaterialUsage(formData);
     setBusy(false);
@@ -86,15 +66,18 @@ export function UsageManager({
       toast.error(res.error);
       return;
     }
-    toast.success('Pemakaian dicatat. Stok proyek otomatis berkurang.');
+    toast.success('Pemakaian dicatat.');
     reset();
     router.refresh();
   }
 
+  const q = query.trim().toLowerCase();
   const filteredUsages = usages.filter(
     (u) =>
-      (!filterProject || u.project_id === filterProject) &&
-      (!filterMaterial || u.material_id === filterMaterial)
+      !q ||
+      u.project_name.toLowerCase().includes(q) ||
+      u.material_name.toLowerCase().includes(q) ||
+      u.used_for.toLowerCase().includes(q)
   );
 
   return (
@@ -111,58 +94,32 @@ export function UsageManager({
           <CardHeader>
             <CardTitle>Catat Pemakaian</CardTitle>
             <CardDescription>
-              Stok proyek otomatis berkurang setelah pemakaian dicatat.
+              Nama proyek, material, dan jumlah bebas diisi.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Proyek</Label>
-                  <Controller
-                    control={control}
-                    name="projectId"
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value || undefined}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="-- Pilih Proyek --" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {projects.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                  <Label htmlFor="projectName">Nama Proyek</Label>
+                  <Input
+                    id="projectName"
+                    placeholder="Cth: Rumah Pak Haji Jamil"
+                    {...register('projectName')}
                   />
-                  {errors.projectId ? (
-                    <p className="text-xs text-destructive">{errors.projectId.message}</p>
+                  {errors.projectName ? (
+                    <p className="text-xs text-destructive">{errors.projectName.message}</p>
                   ) : null}
                 </div>
                 <div className="space-y-2">
-                  <Label>Material</Label>
-                  <Controller
-                    control={control}
-                    name="materialId"
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value || undefined}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="-- Pilih Material --" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {materials.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.name} ({m.unit})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                  <Label htmlFor="materialName">Nama Material / Barang</Label>
+                  <Input
+                    id="materialName"
+                    placeholder="Cth: Semen 50kg"
+                    {...register('materialName')}
                   />
-                  {errors.materialId ? (
-                    <p className="text-xs text-destructive">{errors.materialId.message}</p>
+                  {errors.materialName ? (
+                    <p className="text-xs text-destructive">{errors.materialName.message}</p>
                   ) : null}
                 </div>
               </div>
@@ -170,11 +127,8 @@ export function UsageManager({
                 <Label htmlFor="qtyUsed">Jumlah Terpakai</Label>
                 <Input
                   id="qtyUsed"
-                  type="number"
-                  step="any"
-                  min="0"
-                  placeholder="Cth: 5"
-                  {...register('qtyUsed', { valueAsNumber: true })}
+                  placeholder="Cth: 5 sak"
+                  {...register('qtyUsed')}
                 />
                 {errors.qtyUsed ? (
                   <p className="text-xs text-destructive">{errors.qtyUsed.message}</p>
@@ -208,33 +162,14 @@ export function UsageManager({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Riwayat Pemakaian</h2>
-          <div className="flex flex-wrap gap-2">
-            <Select onValueChange={(v) => setFilterProject(v === 'all' ? '' : v)} value={filterProject || 'all'}>
-              <SelectTrigger size="sm" className="w-[180px]">
-                <SelectValue placeholder="Semua Proyek" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Proyek</SelectItem>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select onValueChange={(v) => setFilterMaterial(v === 'all' ? '' : v)} value={filterMaterial || 'all'}>
-              <SelectTrigger size="sm" className="w-[180px]">
-                <SelectValue placeholder="Semua Material" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Material</SelectItem>
-                {materials.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Cari proyek / material / detail"
+              className="h-9 w-64 pl-9"
+            />
           </div>
         </div>
 
@@ -246,17 +181,15 @@ export function UsageManager({
               <div key={u.id} className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <p className="font-semibold">
-                    {u.materials?.name}{' '}
-                    <span className="font-normal text-muted-foreground">
-                      (-{u.qty_used} {u.materials?.unit})
-                    </span>
+                    {u.material_name}{' '}
+                    <span className="font-normal text-muted-foreground">(-{u.qty_used})</span>
                   </p>
                   <span className="text-xs text-muted-foreground">
                     {formatDateTime(u.used_at)}
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Proyek: <span className="font-medium">{u.projects?.name}</span>
+                  Proyek: <span className="font-medium">{u.project_name}</span>
                 </p>
                 <p className="mt-1 rounded-lg bg-muted/50 p-2 text-sm">{u.used_for}</p>
                 <p className="mt-1 text-xs text-muted-foreground">

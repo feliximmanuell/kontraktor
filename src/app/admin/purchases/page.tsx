@@ -8,48 +8,39 @@ export default async function AdminPurchasesPage() {
   const supabase = await createClient();
   const isAdmin = profile.role === 'admin';
 
-  const [{ data: purchases }, { data: approved }, { data: projects }, { data: materials }] =
-    await Promise.all([
-      supabase
-        .from('purchases')
-        .select(
-          'id, request_id, project_id, material_id, store_name, qty, unit_price, total_price, receipt_status, receipt_image_url, purchased_by, purchased_at, projects(name, location), materials(name, unit)'
-        )
-        .order('purchased_at', { ascending: false }),
-      supabase
-        .from('material_requests')
-        .select(
-          'id, project_id, material_id, material_name, requested_qty, status, projects(name), materials(name, unit)'
-        )
-        .eq('status', 'approved'),
-      supabase.from('projects').select('id, name').eq('status', 'active').order('name'),
-      supabase.from('materials').select('id, name, unit').order('name'),
-    ]);
+  const [{ data: purchases }, { data: approved }] = await Promise.all([
+    supabase
+      .from('purchases')
+      .select(
+        'id, request_id, project_name, material_name, store_name, qty, total_price, receipt_status, receipt_image_url, purchased_by, purchased_at'
+      )
+      .order('purchased_at', { ascending: false }),
+    supabase
+      .from('material_requests')
+      .select('id, project_name, material_name, requested_qty, status')
+      .eq('status', 'approved'),
+  ]);
 
   // Pengajuan disetujui yang belum memiliki catatan pembelian (cegah double buying).
   const purchasedRequestIds = new Set(
-    (purchases ?? []).map((p) => (p as { request_id: string | null }).request_id).filter(Boolean)
+    (purchases ?? [])
+      .map((p) => (p as { request_id: string | null }).request_id)
+      .filter(Boolean)
   );
   const requestOptions = (approved ?? [])
     .filter((r) => !purchasedRequestIds.has(r.id))
     .map((r) => {
       const row = r as unknown as {
         id: string;
-        project_id: string;
-        material_id: string | null;
+        project_name: string;
         material_name: string;
-        requested_qty: number;
-        projects: { name: string } | null;
-        materials: { name: string; unit: string } | null;
+        requested_qty: string;
       };
       return {
         id: row.id,
-        project_id: row.project_id,
-        material_id: row.material_id,
+        project_name: row.project_name,
+        material_name: row.material_name,
         requested_qty: row.requested_qty,
-        material: row.materials?.name ?? row.material_name,
-        unit: row.materials?.unit ?? '',
-        project: row.projects?.name ?? '',
       };
     });
 
@@ -75,18 +66,15 @@ export default async function AdminPurchasesPage() {
     const row = p as unknown as {
       id: string;
       request_id: string | null;
-      project_id: string;
-      material_id: string;
+      project_name: string;
+      material_name: string;
       store_name: string;
-      qty: number;
-      unit_price: number;
+      qty: string;
       total_price: number;
       receipt_status: PurchaseJoined['receipt_status'];
       receipt_image_url: string | null;
       purchased_by: string | null;
       purchased_at: string;
-      projects: { name: string; location: string | null } | null;
-      materials: { name: string; unit: string } | null;
     };
     let receiptUrl: string | null = null;
     if (row.receipt_image_url) {
@@ -103,12 +91,6 @@ export default async function AdminPurchasesPage() {
   }
 
   return (
-    <PurchaseManager
-      requests={requestOptions}
-      purchases={purchaseRows}
-      projects={(projects ?? []) as { id: string; name: string }[]}
-      materials={(materials ?? []) as { id: string; name: string; unit: string }[]}
-      isAdmin={isAdmin}
-    />
+    <PurchaseManager requests={requestOptions} purchases={purchaseRows} isAdmin={isAdmin} />
   );
 }

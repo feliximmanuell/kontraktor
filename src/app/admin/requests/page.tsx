@@ -10,14 +10,16 @@ export default async function AdminRequestsPage() {
   const { data } = await supabase
     .from('material_requests')
     .select(
-      'id, project_id, requester_id, material_id, material_name, requested_qty, notes, status, is_flagged_duplicate, created_at, projects(name, location), materials(name, unit)'
+      'id, project_name, requester_id, material_name, requested_qty, notes, status, is_flagged_duplicate, created_at'
     )
     .order('created_at', { ascending: false });
 
   const rows = data ?? [];
 
   const requesterIds = Array.from(
-    new Set(rows.map((r) => (r as { requester_id: string | null }).requester_id).filter(Boolean) as string[])
+    new Set(
+      rows.map((r) => (r as { requester_id: string | null }).requester_id).filter(Boolean) as string[]
+    )
   );
   const { data: profiles } = requesterIds.length
     ? await supabase
@@ -29,49 +31,29 @@ export default async function AdminRequestsPage() {
     (profiles ?? []).map((p) => [p.user_id as string, p.full_name as string])
   );
 
-  const { data: stocks } = await supabase
-    .from('project_stocks')
-    .select('project_id, material_id, current_stock');
-  const stockMap = new Map(
-    (stocks ?? []).map((s) => [
-      `${(s as { project_id: string }).project_id}:${(s as { material_id: string }).material_id}`,
-      Number((s as { current_stock: number }).current_stock ?? 0),
-    ])
-  );
-
   const joined: RequestJoined[] = rows.map((r) => {
     const row = r as unknown as {
       id: string;
-      project_id: string;
+      project_name: string;
       requester_id: string | null;
-      material_id: string | null;
       material_name: string;
-      requested_qty: number;
+      requested_qty: string;
       notes: string | null;
       status: RequestJoined['status'];
       is_flagged_duplicate: boolean;
       created_at: string;
-      projects: { name: string; location: string | null } | null;
-      materials: { name: string; unit: string } | null;
     };
     return {
       id: row.id,
-      project_id: row.project_id,
+      project_name: row.project_name,
       requester_id: row.requester_id,
-      material_id: row.material_id,
       material_name: row.material_name,
       requested_qty: row.requested_qty,
       notes: row.notes,
       status: row.status,
       is_flagged_duplicate: row.is_flagged_duplicate,
       created_at: row.created_at,
-      projects: row.projects,
-      materials: row.materials,
       requester_name: row.requester_id ? nameMap.get(row.requester_id) ?? 'Pengguna' : 'Publik',
-      current_stock:
-        row.material_id && row.project_id
-          ? stockMap.get(`${row.project_id}:${row.material_id}`) ?? 0
-          : 0,
     };
   });
 

@@ -7,16 +7,10 @@ export default async function AdminUsagePage() {
   const profile = await requireRole(['admin', 'bos']);
   const supabase = await createClient();
 
-  const [{ data: usages }, { data: projects }, { data: materials }] = await Promise.all([
-    supabase
-      .from('material_usages')
-      .select(
-        'id, project_id, material_id, qty_used, used_for, logged_by, used_at, projects(name, location), materials(name, unit)'
-      )
-      .order('used_at', { ascending: false }),
-    supabase.from('projects').select('id, name, status').order('name'),
-    supabase.from('materials').select('id, name, unit').order('name'),
-  ]);
+  const { data: usages } = await supabase
+    .from('material_usages')
+    .select('id, project_name, material_name, qty_used, used_for, logged_by, used_at')
+    .order('used_at', { ascending: false });
 
   const loggedByIds = Array.from(
     new Set(
@@ -35,14 +29,12 @@ export default async function AdminUsagePage() {
   const usageRows: UsageJoined[] = (usages ?? []).map((u) => {
     const row = u as unknown as {
       id: string;
-      project_id: string;
-      material_id: string;
-      qty_used: number;
+      project_name: string;
+      material_name: string;
+      qty_used: string;
       used_for: string;
       logged_by: string | null;
       used_at: string;
-      projects: { name: string; location: string | null } | null;
-      materials: { name: string; unit: string } | null;
     };
     return {
       ...row,
@@ -50,12 +42,5 @@ export default async function AdminUsagePage() {
     };
   });
 
-  return (
-    <UsageManager
-      projects={(projects ?? []) as { id: string; name: string }[]}
-      materials={(materials ?? []) as { id: string; name: string; unit: string }[]}
-      usages={usageRows}
-      isAdmin={profile.role === 'admin'}
-    />
-  );
+  return <UsageManager usages={usageRows} isAdmin={profile.role === 'admin'} />;
 }

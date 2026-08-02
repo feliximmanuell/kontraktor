@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, Controller, useWatch } from 'react-hook-form';
+import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -27,39 +27,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Save, UploadCloud } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2, UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PurchaseJoined } from '@/lib/types';
 import { formatIDR, formatDateTime } from '@/lib/format';
 
 interface ApprovedRequestOption {
   id: string;
-  project_id: string;
-  material_id: string | null;
-  requested_qty: number;
-  material: string;
-  unit: string;
-  project: string;
-}
-
-interface ProjectOption {
-  id: string;
-  name: string;
-}
-interface MaterialOption {
-  id: string;
-  name: string;
-  unit: string;
+  project_name: string;
+  material_name: string;
+  requested_qty: string;
 }
 
 const schema = z.object({
   mode: z.enum(['request', 'manual']),
   requestId: z.string(),
-  projectId: z.string().min(1, 'Pilih proyek'),
-  materialId: z.string().min(1, 'Pilih material'),
-  qty: z.number().min(0.01, 'Jumlah harus lebih dari 0'),
-  unitPrice: z.number().min(0, 'Harga tidak boleh negatif'),
+  projectName: z.string().min(1, 'Nama proyek wajib diisi'),
   storeName: z.string().min(1, 'Nama toko wajib diisi'),
+  items: z
+    .array(
+      z.object({
+        materialName: z.string().min(1, 'Nama material wajib diisi'),
+        qty: z.string().min(1, 'Jumlah wajib diisi'),
+        totalPrice: z.number().min(0, 'Total harga tidak boleh negatif'),
+      })
+    )
+    .min(1, 'Minimal satu barang'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -67,14 +60,10 @@ type FormValues = z.infer<typeof schema>;
 export function PurchaseManager({
   requests,
   purchases,
-  projects,
-  materials,
   isAdmin,
 }: {
   requests: ApprovedRequestOption[];
   purchases: PurchaseJoined[];
-  projects: ProjectOption[];
-  materials: MaterialOption[];
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -93,43 +82,38 @@ export function PurchaseManager({
     defaultValues: {
       mode: 'request',
       requestId: '',
-      projectId: '',
-      materialId: '',
-      qty: undefined,
-      unitPrice: undefined,
+      projectName: '',
       storeName: '',
+      items: [{ materialName: '', qty: '', totalPrice: undefined as unknown as number }],
     },
   });
+
+  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
   const mode = useWatch({ control, name: 'mode' });
   const requestId = useWatch({ control, name: 'requestId' });
 
   const selectedRequest = requests.find((r) => r.id === requestId);
-  const lockMaterial = mode === 'request' && !!selectedRequest?.material_id;
 
-  useEffect(() => {
-    if (mode === 'request' && requestId) {
-      const req = requests.find((r) => r.id === requestId);
-      if (req) {
-        setValue('projectId', req.project_id, { shouldValidate: true });
-        setValue('materialId', req.material_id ?? '', { shouldValidate: true });
-        setValue('qty', req.requested_qty, { shouldValidate: true });
-      }
+  function fillFromRequest() {
+    if (mode === 'request' && selectedRequest) {
+      setValue('projectName', selectedRequest.project_name);
+      setValue('items.0.materialName', selectedRequest.material_name);
+      setValue('items.0.qty', selectedRequest.requested_qty);
     }
-    if (mode === 'manual') {
-      setValue('requestId', '');
-    }
-  }, [mode, requestId, requests, setValue]);
+  }
 
   async function onSubmit(values: FormValues) {
     setBusy(true);
     const formData = new FormData();
     formData.set('requestId', values.mode === 'request' ? values.requestId : '');
-    formData.set('projectId', values.projectId);
-    formData.set('materialId', values.materialId);
+    formData.set('projectName', values.projectName);
     formData.set('storeName', values.storeName);
-    formData.set('qty', String(values.qty));
-    formData.set('unitPrice', String(values.unitPrice));
+    values.items.forEach((it) => {
+      formData.append('materialName', it.materialName);
+      formData.append('qty', it.qty);
+      formData.append('totalPrice', String(it.totalPrice));
+    });
     if (receiptFile) formData.set('receipt', receiptFile);
 
     const res = await createPurchase(formData);
@@ -138,8 +122,14 @@ export function PurchaseManager({
       toast.error(res.error);
       return;
     }
-    toast.success('Pembelian dicatat. Stok proyek otomatis bertambah.');
-    reset({ mode: 'request', requestId: '', projectId: '', materialId: '', qty: undefined, unitPrice: undefined, storeName: '' });
+    toast.success('Pembelian dicatat.');
+    reset({
+      mode: 'request',
+      requestId: '',
+      projectName: '',
+      storeName: '',
+      items: [{ materialName: '', qty: '', totalPrice: undefined as unknown as number }],
+    });
     setReceiptFile(null);
     router.refresh();
   }
@@ -161,7 +151,8 @@ export function PurchaseManager({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Manajemen Pembelian</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Catat pembelian material, unggah bon, dan pantau status bon/nota.
+          Catat pembelian material (bisa lebih dari satu barang), unggah bon, dan
+          pantau status bon/nota.
         </p>
       </div>
 
@@ -170,7 +161,7 @@ export function PurchaseManager({
           <CardHeader>
             <CardTitle>Catat Pembelian Baru</CardTitle>
             <CardDescription>
-              Pilih pengajuan yang disetujui, atau catat manual dari pembelian toko.
+              Pilih pengajuan yang disetujui (otomatis terisi), atau catat manual.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -197,98 +188,62 @@ export function PurchaseManager({
               {mode === 'request' ? (
                 <div className="space-y-2">
                   <Label>Pilih Pengajuan (Disetujui)</Label>
-                  <Controller
-                    control={control}
-                    name="requestId"
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value || undefined}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="-- Pilih Pengajuan --" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {requests.length === 0 ? (
-                            <div className="px-3 py-2 text-sm text-muted-foreground">
-                              Tidak ada pengajuan disetujui yang belum dibeli
-                            </div>
-                          ) : (
-                            requests.map((r) => (
-                              <SelectItem key={r.id} value={r.id}>
-                                {r.material} ({r.requested_qty} {r.unit}) - {r.project}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
+                  <div className="flex gap-2">
+                    <Controller
+                      control={control}
+                      name="requestId"
+                      render={({ field }) => (
+                        <Select
+                          onValueChange={(v) => {
+                            field.onChange(v);
+                            setTimeout(fillFromRequest, 0);
+                          }}
+                          value={field.value || undefined}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="-- Pilih Pengajuan --" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {requests.length === 0 ? (
+                              <div className="px-3 py-2 text-sm text-muted-foreground">
+                                Tidak ada pengajuan disetujui yang belum dibeli
+                              </div>
+                            ) : (
+                              requests.map((r) => (
+                                <SelectItem key={r.id} value={r.id}>
+                                  {r.material_name} ({r.requested_qty}) - {r.project_name}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={fillFromRequest}
+                      disabled={!selectedRequest}
+                    >
+                      Isi
+                    </Button>
+                  </div>
                 </div>
               ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Proyek</Label>
-                  <Controller
-                    control={control}
-                    name="projectId"
-                    render={({ field }) => (
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value || undefined}
-                        disabled={mode === 'request'}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="-- Pilih Proyek --" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {projects.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                  <Label htmlFor="projectName">Nama Proyek</Label>
+                  <Input
+                    id="projectName"
+                    placeholder="Cth: Rumah Pak Haji Jamil"
+                    {...register('projectName')}
                   />
-                  {errors.projectId ? (
-                    <p className="text-xs text-destructive">{errors.projectId.message}</p>
+                  {errors.projectName ? (
+                    <p className="text-xs text-destructive">{errors.projectName.message}</p>
                   ) : null}
                 </div>
-                <div className="space-y-2">
-                  <Label>Material</Label>
-                  <Controller
-                    control={control}
-                    name="materialId"
-                    render={({ field }) => (
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value || undefined}
-                        disabled={lockMaterial}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="-- Pilih Material --" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {materials.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.name} ({m.unit})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.materialId ? (
-                    <p className="text-xs text-destructive">{errors.materialId.message}</p>
-                  ) : null}
-                  {mode === 'request' && selectedRequest && !selectedRequest.material_id ? (
-                    <p className="text-xs text-muted-foreground">
-                      Pengajuan ini tidak terhubung ke material master — pilih material yang sesuai.
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="storeName">Nama Toko</Label>
                   <Input
@@ -300,34 +255,87 @@ export function PurchaseManager({
                     <p className="text-xs text-destructive">{errors.storeName.message}</p>
                   ) : null}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="qty">Jumlah ({mode === 'request' ? 'dari pengajuan' : 'Qty'})</Label>
-                  <Input
-                    id="qty"
-                    type="number"
-                    step="any"
-                    min="0"
-                    disabled={mode === 'request'}
-                    {...register('qty', { valueAsNumber: true })}
-                  />
-                  {errors.qty ? (
-                    <p className="text-xs text-destructive">{errors.qty.message}</p>
-                  ) : null}
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Barang yang Dibeli</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      append({ materialName: '', qty: '', totalPrice: undefined as unknown as number })
+                    }
+                  >
+                    <Plus />
+                    Tambah Barang
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unitPrice">Harga Satuan (Rp)</Label>
-                  <Input
-                    id="unitPrice"
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder="50000"
-                    {...register('unitPrice', { valueAsNumber: true })}
-                  />
-                  {errors.unitPrice ? (
-                    <p className="text-xs text-destructive">{errors.unitPrice.message}</p>
-                  ) : null}
-                </div>
+
+                {fields.map((field, index) => (
+                  <div
+                    key={field.id}
+                    className="rounded-lg border p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Barang {index + 1}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-destructive"
+                        disabled={fields.length === 1}
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="space-y-1 sm:col-span-1">
+                        <Input
+                          placeholder="Nama material"
+                          {...register(`items.${index}.materialName` as const)}
+                        />
+                        {errors.items?.[index]?.materialName ? (
+                          <p className="text-xs text-destructive">
+                            {errors.items[index].materialName.message}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="space-y-1">
+                        <Input
+                          placeholder="Qty (mis. 5 sak)"
+                          {...register(`items.${index}.qty` as const)}
+                        />
+                        {errors.items?.[index]?.qty ? (
+                          <p className="text-xs text-destructive">
+                            {errors.items[index].qty.message}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="space-y-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Total harga (Rp)"
+                          {...register(`items.${index}.totalPrice` as const, { valueAsNumber: true })}
+                        />
+                        {errors.items?.[index]?.totalPrice ? (
+                          <p className="text-xs text-destructive">
+                            {errors.items[index].totalPrice.message}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {errors.items?.message ? (
+                  <p className="text-xs text-destructive">{errors.items.message}</p>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -347,7 +355,7 @@ export function PurchaseManager({
 
               <Button type="submit" disabled={busy}>
                 {busy ? <Loader2 className="animate-spin" /> : <Save />}
-                {busy ? 'Menyimpan & Uploading...' : 'Simpan Pembelian'}
+                {busy ? 'Menyimpan...' : 'Simpan Pembelian'}
               </Button>
             </form>
           </CardContent>
@@ -403,9 +411,9 @@ export function PurchaseManager({
                     <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                       {formatDateTime(p.purchased_at)}
                     </td>
-                    <td className="px-4 py-3 font-medium">{p.projects?.name}</td>
+                    <td className="px-4 py-3 font-medium">{p.project_name}</td>
                     <td className="px-4 py-3">
-                      {p.materials?.name} ({p.qty} {p.materials?.unit})
+                      {p.material_name} ({p.qty})
                     </td>
                     <td className="px-4 py-3">{p.store_name}</td>
                     <td className="px-4 py-3 text-right">{p.qty}</td>
