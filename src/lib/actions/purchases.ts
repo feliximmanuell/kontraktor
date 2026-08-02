@@ -38,6 +38,7 @@ export async function createPurchase(formData: FormData): Promise<ActionResponse
   const storeName = String(formData.get('storeName') ?? '').trim();
   const requestId = String(formData.get('requestId') ?? '') || null;
   const file = (formData.get('receipt') as File | null) ?? null;
+  const groupId = crypto.randomUUID();
 
   const materialNames = formData.getAll('materialName').map((v) => String(v).trim());
   const qtys = formData.getAll('qty').map((v) => String(v).trim());
@@ -70,6 +71,7 @@ export async function createPurchase(formData: FormData): Promise<ActionResponse
   }
 
   const rows = materialNames.map((materialName, i) => ({
+    purchase_group: groupId,
     request_id: i === 0 ? requestId : null,
     project_id: null,
     project_name: projectName,

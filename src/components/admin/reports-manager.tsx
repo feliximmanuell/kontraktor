@@ -1,0 +1,162 @@
+'use client';
+
+import { useState } from 'react';
+import { EmptyState } from '@/components/empty-state';
+import { formatIDR, formatDateTime } from '@/lib/format';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { ReportRow } from '@/lib/types';
+
+export function ReportsManager({ rows }: { rows: ReportRow[] }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggle(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const total = rows.reduce((acc, r) => acc + (r.kind === 'group' ? r.total : r.amount), 0);
+  const totalPurchase = rows
+    .filter((r) => r.kind === 'group')
+    .reduce((acc, r) => acc + r.total, 0);
+  const totalManual = rows
+    .filter((r) => r.kind === 'manual')
+    .reduce((acc, r) => acc + r.amount, 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+          <p className="text-xs font-medium text-muted-foreground">Total Pengeluaran</p>
+          <p className="text-lg font-semibold">{formatIDR(total)}</p>
+        </div>
+        <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+          <p className="text-xs font-medium text-muted-foreground">Pembelian</p>
+          <p className="text-lg font-semibold">{formatIDR(totalPurchase)}</p>
+        </div>
+        <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+          <p className="text-xs font-medium text-muted-foreground">Manual</p>
+          <p className="text-lg font-semibold">{formatIDR(totalManual)}</p>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyState
+          title="Tidak ada data"
+          description="Sesuaikan filter atau catat pengeluaran terlebih dahulu."
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="w-10 px-2 py-3" />
+                <th className="px-2 py-3 font-medium">Tanggal</th>
+                <th className="px-4 py-3 font-medium">Proyek</th>
+                <th className="px-4 py-3 font-medium">Material</th>
+                <th className="px-4 py-3 font-medium">Keterangan</th>
+                <th className="px-4 py-3 font-medium">Tipe</th>
+                <th className="px-4 py-3 text-right font-medium">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const isOpen = expanded.has(r.id);
+                return (
+                  <RowGroup key={r.id} row={r} isOpen={isOpen} onToggle={() => toggle(r.id)} />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RowGroup({
+  row,
+  isOpen,
+  onToggle,
+}: {
+  row: ReportRow;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const isGroup = row.kind === 'group';
+  return (
+    <>
+      <tr
+        className={cn('border-b last:border-0', isGroup && isOpen && 'border-transparent bg-muted/30')}
+      >
+        <td className="px-2 py-3">
+          {isGroup ? (
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label={isOpen ? 'Tutup rincian' : 'Lihat rincian'}
+              className="inline-flex rounded-md p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <ChevronDown
+                className={cn('size-4 transition-transform', isOpen && 'rotate-180')}
+              />
+            </button>
+          ) : (
+            <ChevronRight className="size-4 text-muted-foreground/30" />
+          )}
+        </td>
+        <td className="whitespace-nowrap px-2 py-3 text-muted-foreground">
+          {formatDateTime(row.paid_at)}
+        </td>
+        <td className="px-4 py-3 font-medium">{row.project_name}</td>
+        <td className="px-4 py-3">
+          {isGroup ? `${row.items.length} item` : (row.material_name ?? '-')}
+        </td>
+        <td className="px-4 py-3">{row.description}</td>
+        <td className="px-4 py-3">
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold',
+              isGroup
+                ? 'border-blue-300 bg-blue-50 text-blue-700'
+                : 'border-purple-300 bg-purple-50 text-purple-700'
+            )}
+          >
+            {isGroup ? 'Pembelian' : 'Manual'}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-right font-semibold">
+          {formatIDR(isGroup ? row.total : row.amount)}
+        </td>
+      </tr>
+      {isGroup && isOpen ? (
+        <tr className="border-b bg-muted/30 last:border-0">
+          <td colSpan={7} className="px-10 py-3">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="py-1 pr-2 font-medium">Material</th>
+                  <th className="py-1 pr-2 text-right font-medium">Qty</th>
+                  <th className="py-1 text-right font-medium">Jumlah Dibayar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {row.items.map((it, i) => (
+                  <tr key={`${row.id}-${i}`} className="border-b last:border-0">
+                    <td className="py-1.5 pr-2 font-medium">{it.material_name}</td>
+                    <td className="py-1.5 pr-2 text-right">{it.qty || '-'}</td>
+                    <td className="py-1.5 text-right font-medium">{formatIDR(it.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      ) : null}
+    </>
+  );
+}

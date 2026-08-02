@@ -98,6 +98,7 @@ export interface PaymentJoined extends Payment {
 
 export interface UnpaidPurchase {
   id: string;
+  purchase_group: string;
   project_name: string;
   material_name: string;
   store_name: string;
@@ -105,6 +106,34 @@ export interface UnpaidPurchase {
   total_price: number;
   purchased_at: string;
 }
+
+export interface ReportGroupItem {
+  material_name: string;
+  qty: string;
+  amount: number;
+}
+
+export interface ReportGroupRow {
+  kind: 'group';
+  id: string;
+  paid_at: string;
+  project_name: string;
+  description: string;
+  items: ReportGroupItem[];
+  total: number;
+}
+
+export interface ReportManualRow {
+  kind: 'manual';
+  id: string;
+  paid_at: string;
+  project_name: string;
+  material_name: string | null;
+  description: string;
+  amount: number;
+}
+
+export type ReportRow = ReportGroupRow | ReportManualRow;
 
 // ---- Tipe gabungan (join) yang dipakai di UI ----
 

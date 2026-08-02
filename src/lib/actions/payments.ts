@@ -25,24 +25,43 @@ async function requireAdmin() {
   return { supabase, user };
 }
 
-/** Bayar satu/beberapa pembelian sekaligus. */
-export async function payPurchases(
-  items: { id: string; amount: number; paid_at: string }[]
+/** Bayar satu transaksi pembelian (bisa berisi banyak item) sekaligus. */
+export async function payPurchaseGroup(
+  ids: string[],
+  input: { amount: number; paid_at: string }
 ): Promise<ActionResponse> {
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 
-  if (items.length === 0) {
+  if (ids.length === 0) {
     return { error: 'Pilih pembelian yang akan dibayar.' };
   }
+  const amount = Number(input.amount);
+  if (!(amount >= 0) || !input.paid_at) {
+    return { error: 'Data pembayaran tidak valid.' };
+  }
 
-  const ids = items.map((i) => i.id);
   const { data: rows } = await ctx.supabase
     .from('purchases')
     .select('id, project_name, material_name, total_price, paid')
     .in('id', ids);
 
   if (!rows) return { error: 'Pembelian tidak ditemukan.' };
+
+  const unpaid = rows.filter((r) => !r.paid);
+  if (unpaid.length === 0) {
+    return { error: 'Semua pembelian ini sudah dibayar.' };
+  }
+
+  // Distribusikan jumlah yang dibayar secara proporsional per item.
+  const sum = unpaid.reduce((acc, r) => acc + Number(r.total_price), 0);
+  const shares = unpaid.map((p) => {
+    const raw = sum > 0 ? (amount * Number(p.total_price)) / sum : amount / unpaid.length;
+    return Math.floor(raw * 100) / 100;
+  });
+  const totalShare = shares.reduce((a, b) => a + b, 0);
+  shares[shares.length - 1] =
+    Math.round((shares[shares.length - 1] + (amount - totalShare)) * 100) / 100;
 
   const paymentRows: {
     payment_type: 'purchase';
@@ -53,31 +72,16 @@ export async function payPurchases(
     amount: number;
     paid_at: string;
     paid_by: string;
-  }[] = [];
-  const paidIds: string[] = [];
-
-  for (const it of items) {
-    const p = rows.find((r) => r.id === it.id);
-    if (!p) continue;
-    if (p.paid) continue;
-    const amount = Number(it.amount);
-    if (!(amount >= 0)) continue;
-    paymentRows.push({
-      payment_type: 'purchase',
-      purchase_id: p.id,
-      description: `Pembayaran pembelian ${p.material_name}`,
-      project_name: p.project_name,
-      material_name: p.material_name,
-      amount,
-      paid_at: it.paid_at,
-      paid_by: ctx.user.id,
-    });
-    paidIds.push(p.id);
-  }
-
-  if (paymentRows.length === 0) {
-    return { error: 'Tidak ada pembelian yang bisa dibayar (mungkin sudah dibayar).' };
-  }
+  }[] = unpaid.map((p, i) => ({
+    payment_type: 'purchase',
+    purchase_id: p.id,
+    description: `Pembayaran pembelian ${p.material_name}`,
+    project_name: p.project_name,
+    material_name: p.material_name,
+    amount: shares[i],
+    paid_at: input.paid_at,
+    paid_by: ctx.user.id,
+  }));
 
   const { error: insErr } = await ctx.supabase.from('payments').insert(paymentRows);
   if (insErr) return { error: insErr.message };
@@ -85,7 +89,7 @@ export async function payPurchases(
   const { error: updErr } = await ctx.supabase
     .from('purchases')
     .update({ paid: true })
-    .in('id', paidIds);
+    .in('id', unpaid.map((p) => p.id));
   if (updErr) return { error: updErr.message };
 
   revalidatePath('/admin/payments');

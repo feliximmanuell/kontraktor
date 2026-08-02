@@ -1,9 +1,8 @@
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
-import { EmptyState } from '@/components/empty-state';
-import { formatIDR, formatDateTime } from '@/lib/format';
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ReportsManager } from '@/components/admin/reports-manager';
+import type { ReportGroupRow, ReportRow } from '@/lib/types';
 
 const SORTS = ['paid_at', 'project_name', 'material_name'] as const;
 type SortCol = (typeof SORTS)[number];
@@ -27,7 +26,9 @@ export default async function AdminReportsPage({
 
   let query = supabase
     .from('payments')
-    .select('id, payment_type, description, project_name, material_name, amount, paid_at, paid_by');
+    .select(
+      'id, payment_type, purchase_id, description, project_name, material_name, amount, paid_at'
+    );
 
   if (project) query = query.ilike('project_name', `%${project}%`);
   if (material) query = query.ilike('material_name', `%${material}%`);
@@ -35,74 +36,119 @@ export default async function AdminReportsPage({
   if (to) query = query.lte('paid_at', `${to}T23:59:59`);
   if (type === 'purchase' || type === 'manual') query = query.eq('payment_type', type);
 
-  query = query.order(sort, { ascending: dir === 'asc' });
-
   const { data } = await query;
-  const rows = (data ?? []) as unknown as {
+  const payments = (data ?? []) as unknown as {
     id: string;
     payment_type: 'purchase' | 'manual';
+    purchase_id: string | null;
     description: string;
     project_name: string;
     material_name: string | null;
     amount: number;
     paid_at: string;
-    paid_by: string | null;
   }[];
 
-  const total = rows.reduce((acc, r) => acc + Number(r.amount ?? 0), 0);
-  const totalPurchase = rows
-    .filter((r) => r.payment_type === 'purchase')
-    .reduce((acc, r) => acc + Number(r.amount ?? 0), 0);
-  const totalManual = rows
-    .filter((r) => r.payment_type === 'manual')
-    .reduce((acc, r) => acc + Number(r.amount ?? 0), 0);
-
-  function hrefFor(col: SortCol) {
-    const p = new URLSearchParams();
-    if (project) p.set('project', project);
-    if (material) p.set('material', material);
-    if (from) p.set('from', from);
-    if (to) p.set('to', to);
-    if (type) p.set('type', type);
-    p.set('sort', col);
-    p.set('dir', sort === col && dir === 'asc' ? 'desc' : 'asc');
-    return `?${p.toString()}`;
+  // Ambil purchase_group + detail item dari pembelian yang terkait.
+  const purchaseIds = Array.from(
+    new Set(
+      payments
+        .filter((p) => p.payment_type === 'purchase' && p.purchase_id)
+        .map((p) => p.purchase_id as string)
+    )
+  );
+  const purchaseMap = new Map<
+    string,
+    { purchase_group: string; material_name: string; qty: string }
+  >();
+  if (purchaseIds.length > 0) {
+    const { data: purchases } = await supabase
+      .from('purchases')
+      .select('id, purchase_group, material_name, qty')
+      .in('id', purchaseIds);
+    for (const p of purchases ?? []) {
+      const row = p as unknown as {
+        id: string;
+        purchase_group: string;
+        material_name: string;
+        qty: string;
+      };
+      purchaseMap.set(row.id, {
+        purchase_group: row.purchase_group,
+        material_name: row.material_name,
+        qty: row.qty,
+      });
+    }
   }
 
-  function sortLink(col: SortCol, children: React.ReactNode) {
-    const active = sort === col;
-    return (
-      <a
-        href={hrefFor(col)}
-        className={`inline-flex items-center gap-1 hover:text-foreground ${
-          active ? 'text-foreground' : ''
-        }`}
-      >
-        {children}
-        {active ? (
-          dir === 'asc' ? (
-            <ArrowUp className="size-3.5" />
-          ) : (
-            <ArrowDown className="size-3.5" />
-          )
-        ) : (
-          <ArrowUpDown className="size-3.5 opacity-40" />
-        )}
-      </a>
-    );
+  // Gabungkan pembayaran pembelian dalam satu transaksi (purchase_group).
+  const groupMap = new Map<string, ReportGroupRow>();
+  const rows: ReportRow[] = [];
+
+  for (const p of payments) {
+    if (p.payment_type === 'purchase' && p.purchase_id) {
+      const purchase = purchaseMap.get(p.purchase_id);
+      const gid = purchase?.purchase_group ?? p.purchase_id;
+      let group = groupMap.get(gid);
+      if (!group) {
+        group = {
+          kind: 'group',
+          id: gid,
+          paid_at: p.paid_at,
+          project_name: p.project_name,
+          description: '',
+          items: [],
+          total: 0,
+        };
+        groupMap.set(gid, group);
+      }
+      group.items.push({
+        material_name: purchase?.material_name ?? p.material_name ?? '',
+        qty: purchase?.qty ?? '',
+        amount: Number(p.amount ?? 0),
+      });
+      group.total += Number(p.amount ?? 0);
+      if (p.paid_at < group.paid_at) group.paid_at = p.paid_at;
+    } else {
+      rows.push({
+        kind: 'manual',
+        id: p.id,
+        paid_at: p.paid_at,
+        project_name: p.project_name,
+        material_name: p.material_name,
+        description: p.description,
+        amount: Number(p.amount ?? 0),
+      });
+    }
   }
+  for (const g of groupMap.values()) {
+    g.description = `Pembayaran pembelian (${g.items.length} item)`;
+    rows.push(g);
+  }
+
+  rows.sort((a, b) => {
+    let av: string;
+    let bv: string;
+    if (sort === 'project_name') {
+      av = a.project_name;
+      bv = b.project_name;
+    } else if (sort === 'material_name') {
+      av = a.kind === 'group' ? a.items[0]?.material_name ?? '' : a.material_name ?? '';
+      bv = b.kind === 'group' ? b.items[0]?.material_name ?? '' : b.material_name ?? '';
+    } else {
+      av = a.paid_at;
+      bv = b.paid_at;
+    }
+    return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Laporan Pengeluaran"
-        description="Filter dan urutkan pengeluaran berdasarkan proyek, material, atau tanggal."
+        description="Filter dan urutkan pengeluaran berdasarkan proyek, material, atau tanggal. Klik panah untuk melihat rincian pembelian."
       />
 
-      <form
-        method="get"
-        className="rounded-xl bg-card p-4 ring-1 ring-foreground/10"
-      >
+      <form method="get" className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <div className="space-y-1 lg:col-span-2">
             <label className="text-xs font-medium text-muted-foreground">Proyek</label>
@@ -164,71 +210,7 @@ export default async function AdminReportsPage({
         </div>
       </form>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-          <p className="text-xs font-medium text-muted-foreground">Total Pengeluaran</p>
-          <p className="text-lg font-semibold">{formatIDR(total)}</p>
-        </div>
-        <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-          <p className="text-xs font-medium text-muted-foreground">Pembelian</p>
-          <p className="text-lg font-semibold">{formatIDR(totalPurchase)}</p>
-        </div>
-        <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-          <p className="text-xs font-medium text-muted-foreground">Manual</p>
-          <p className="text-lg font-semibold">{formatIDR(totalManual)}</p>
-        </div>
-      </div>
-
-      {rows.length === 0 ? (
-        <EmptyState title="Tidak ada data" description="Sesuaikan filter atau catat pengeluaran terlebih dahulu." />
-      ) : (
-        <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="px-4 py-3 font-medium">
-                  {sortLink('paid_at', 'Tanggal')}
-                </th>
-                <th className="px-4 py-3 font-medium">
-                  {sortLink('project_name', 'Proyek')}
-                </th>
-                <th className="px-4 py-3 font-medium">
-                  {sortLink('material_name', 'Material')}
-                </th>
-                <th className="px-4 py-3 font-medium">Keterangan</th>
-                <th className="px-4 py-3 font-medium">Tipe</th>
-                <th className="px-4 py-3 text-right font-medium">Jumlah</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b last:border-0">
-                  <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                    {formatDateTime(r.paid_at)}
-                  </td>
-                  <td className="px-4 py-3 font-medium">{r.project_name}</td>
-                  <td className="px-4 py-3">{r.material_name ?? '-'}</td>
-                  <td className="px-4 py-3">{r.description}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${
-                        r.payment_type === 'purchase'
-                          ? 'border-blue-300 bg-blue-50 text-blue-700'
-                          : 'border-purple-300 bg-purple-50 text-purple-700'
-                      }`}
-                    >
-                      {r.payment_type === 'purchase' ? 'Pembelian' : 'Manual'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold">
-                    {formatIDR(r.amount)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <ReportsManager rows={rows} />
     </div>
   );
 }

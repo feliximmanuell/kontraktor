@@ -10,7 +10,9 @@ export default async function AdminPaymentsPage() {
   const [{ data: unpaid }, { data: payments }] = await Promise.all([
     supabase
       .from('purchases')
-      .select('id, project_name, material_name, store_name, qty, total_price, purchased_at')
+      .select(
+        'id, purchase_group, project_name, material_name, store_name, qty, total_price, purchased_at'
+      )
       .eq('paid', false)
       .order('purchased_at', { ascending: false }),
     supabase

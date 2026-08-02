@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import {
-  payPurchases,
+  payPurchaseGroup,
   createManualPayment,
   updatePayment,
   deletePayment,
@@ -31,9 +31,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Wallet, Plus, Pencil, Trash2, Save } from 'lucide-react';
+import { Loader2, Wallet, Plus, Pencil, Trash2, Save, ChevronDown } from 'lucide-react';
 import type { PaymentJoined, UnpaidPurchase } from '@/lib/types';
 import { formatIDR, formatDateTime } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 function todayInput() {
   return new Date().toISOString().slice(0, 10);
@@ -49,6 +50,15 @@ const manualSchema = z.object({
 
 type ManualValues = z.infer<typeof manualSchema>;
 
+interface UnpaidGroup {
+  group: string;
+  projectName: string;
+  storeName: string;
+  purchasedAt: string;
+  items: UnpaidPurchase[];
+  total: number;
+}
+
 export function PaymentsManager({
   unpaid,
   payments,
@@ -59,10 +69,11 @@ export function PaymentsManager({
   isAdmin: boolean;
 }) {
   const router = useRouter();
-  const [payTarget, setPayTarget] = useState<UnpaidPurchase | null>(null);
+  const [payTarget, setPayTarget] = useState<UnpaidGroup | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(todayInput());
   const [payBusy, setPayBusy] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PaymentJoined | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [manualBusy, setManualBusy] = useState(false);
@@ -92,9 +103,28 @@ export function PaymentsManager({
     },
   });
 
-  function openPay(p: UnpaidPurchase) {
-    setPayTarget(p);
-    setPayAmount(String(p.total_price));
+  const unpaidGroups: UnpaidGroup[] = Array.from(
+    unpaid
+      .reduce((map, p) => {
+        const key = p.purchase_group;
+        const list = map.get(key);
+        if (list) list.push(p);
+        else map.set(key, [p]);
+        return map;
+      }, new Map<string, UnpaidPurchase[]>())
+      .values()
+  ).map((items) => ({
+    group: items[0].purchase_group,
+    projectName: items[0].project_name,
+    storeName: items[0].store_name,
+    purchasedAt: items[0].purchased_at,
+    items,
+    total: items.reduce((acc, it) => acc + Number(it.total_price), 0),
+  }));
+
+  function openPay(g: UnpaidGroup) {
+    setPayTarget(g);
+    setPayAmount(String(g.total));
     setPayDate(todayInput());
   }
 
@@ -144,9 +174,10 @@ export function PaymentsManager({
       return;
     }
     setPayBusy(true);
-    const res = await payPurchases([
-      { id: payTarget.id, amount, paid_at: new Date(payDate + 'T00:00:00').toISOString() },
-    ]);
+    const res = await payPurchaseGroup(
+      payTarget.items.map((it) => it.id),
+      { amount, paid_at: new Date(payDate + 'T00:00:00').toISOString() }
+    );
     setPayBusy(false);
     if (res.error) {
       toast.error(res.error);
@@ -215,31 +246,69 @@ export function PaymentsManager({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {unpaid.length === 0 ? (
+              {unpaidGroups.length === 0 ? (
                 <EmptyState title="Semua pembelian sudah dibayar" />
               ) : (
                 <div className="space-y-3">
-                  {unpaid.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-medium">
-                          {p.material_name}{' '}
-                          <span className="font-normal text-muted-foreground">({p.qty})</span>
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {p.project_name} · {p.store_name} · {formatDateTime(p.purchased_at)}
-                        </p>
+                  {unpaidGroups.map((g) => (
+                    <div key={g.group} className="rounded-lg border p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium">{g.projectName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {g.storeName} · {formatDateTime(g.purchasedAt)} · {g.items.length}{' '}
+                            item
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{formatIDR(g.total)}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setExpandedGroup(expandedGroup === g.group ? null : g.group)
+                            }
+                          >
+                            <ChevronDown
+                              className={cn(
+                                'size-4 transition-transform',
+                                expandedGroup === g.group && 'rotate-180'
+                              )}
+                            />
+                            Detail
+                          </Button>
+                          <Button size="sm" onClick={() => openPay(g)}>
+                            <Wallet />
+                            Bayar
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold">{formatIDR(p.total_price)}</span>
-                        <Button size="sm" onClick={() => openPay(p)}>
-                          <Wallet />
-                          Bayar
-                        </Button>
-                      </div>
+                      {expandedGroup === g.group ? (
+                        <div className="mt-3 overflow-x-auto rounded-md bg-muted/40 p-2">
+                          <table className="w-full min-w-[480px] text-sm">
+                            <thead>
+                              <tr className="border-b text-left text-xs text-muted-foreground">
+                                <th className="py-1 pr-2 font-medium">Material</th>
+                                <th className="py-1 pr-2 text-right font-medium">Qty</th>
+                                <th className="py-1 text-right font-medium">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {g.items.map((it) => (
+                                <tr key={it.id} className="border-b last:border-0">
+                                  <td className="py-1.5 pr-2 font-medium">
+                                    {it.material_name}
+                                  </td>
+                                  <td className="py-1.5 pr-2 text-right">{it.qty}</td>
+                                  <td className="py-1.5 text-right font-medium">
+                                    {formatIDR(it.total_price)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -404,11 +473,23 @@ export function PaymentsManager({
             <DialogTitle>Bayar Pembelian</DialogTitle>
             <DialogDescription>
               {payTarget
-                ? `${payTarget.material_name} (${payTarget.qty}) — ${payTarget.project_name}`
+                ? `${payTarget.projectName} · ${payTarget.storeName} — ${payTarget.items.length} item, total ${formatIDR(payTarget.total)}`
                 : ''}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {payTarget && payTarget.items.length > 1 ? (
+              <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+                {payTarget.items.map((it) => (
+                  <p key={it.id} className="flex justify-between gap-2 py-0.5">
+                    <span>
+                      {it.material_name} ({it.qty})
+                    </span>
+                    <span className="font-medium">{formatIDR(it.total_price)}</span>
+                  </p>
+                ))}
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="payAmount">Jumlah Dibayar (Rp)</Label>
               <Input
@@ -421,7 +502,7 @@ export function PaymentsManager({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="payDate">Tanggal Bayar</Label>
+              <Label htmlFor="payDate">Tanggal Bayar (Tahun-Bulan-Tanggal)</Label>
               <Input
                 id="payDate"
                 type="date"
