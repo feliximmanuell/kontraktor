@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 
@@ -10,7 +11,12 @@ export interface AuthProfile {
   role: Role;
 }
 
-export async function getAuthProfile(): Promise<AuthProfile | null> {
+/**
+ * Ambil profil pengguna yang login. Dibungkus React `cache()` agar dalam satu
+ * request (layout + halaman + komponen server) auth hanya dipanggil sekali,
+ * bukan berulang kali (menghemat beberapa round-trip jaringan ke Supabase).
+ */
+export const getAuthProfile = cache(async (): Promise<AuthProfile | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -24,7 +30,7 @@ export async function getAuthProfile(): Promise<AuthProfile | null> {
     .maybeSingle();
 
   return (data as AuthProfile | null) ?? null;
-}
+});
 
 /** Wajib login. Redirect ke /login jika tidak. */
 export async function requireAuth(): Promise<AuthProfile> {

@@ -70,35 +70,36 @@ export default async function AdminPurchasesPage() {
     (profiles ?? []).map((p) => [p.user_id as string, p.full_name as string])
   );
 
-  const purchaseRows: PurchaseJoined[] = [];
-  for (const p of purchases ?? []) {
-    const row = p as unknown as {
-      id: string;
-      request_id: string | null;
-      project_name: string;
-      material_name: string;
-      store_name: string;
-      qty: string;
-      total_price: number;
-      paid: boolean;
-      receipt_status: PurchaseJoined['receipt_status'];
-      receipt_image_url: string | null;
-      purchased_by: string | null;
-      purchased_at: string;
-    };
-    let receiptUrl: string | null = null;
-    if (row.receipt_image_url) {
-      const { data: signed } = await supabase.storage
-        .from('receipts')
-        .createSignedUrl(row.receipt_image_url, 3600);
-      receiptUrl = signed?.signedUrl ?? null;
-    }
-    purchaseRows.push({
-      ...row,
-      receipt_url: receiptUrl,
-      purchased_by_name: nameMap.get(row.purchased_by ?? '') ?? '-',
-    });
-  }
+  const purchaseRows: PurchaseJoined[] = await Promise.all(
+    (purchases ?? []).map(async (p) => {
+      const row = p as unknown as {
+        id: string;
+        request_id: string | null;
+        project_name: string;
+        material_name: string;
+        store_name: string;
+        qty: string;
+        total_price: number;
+        paid: boolean;
+        receipt_status: PurchaseJoined['receipt_status'];
+        receipt_image_url: string | null;
+        purchased_by: string | null;
+        purchased_at: string;
+      };
+      let receiptUrl: string | null = null;
+      if (row.receipt_image_url) {
+        const { data: signed } = await supabase.storage
+          .from('receipts')
+          .createSignedUrl(row.receipt_image_url, 3600);
+        receiptUrl = signed?.signedUrl ?? null;
+      }
+      return {
+        ...row,
+        receipt_url: receiptUrl,
+        purchased_by_name: nameMap.get(row.purchased_by ?? '') ?? '-',
+      };
+    })
+  );
 
   return (
     <PurchaseManager

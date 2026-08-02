@@ -43,30 +43,23 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
-  let role: string | null = null;
-  const { data: profile } = await supabase
-    .from('users_profile')
-    .select('role')
-    .eq('user_id', user.id)
-    .maybeSingle();
-  role = profile?.role ?? null;
-
   if (isLogin) {
+    // Hanya di halaman login kita butuh role (query ringan; jarang dikunjungi).
+    const { data: profile } = await supabase
+      .from('users_profile')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const role = profile?.role ?? 'tukang';
     const url = request.nextUrl.clone();
     url.pathname = role === 'tukang' ? '/request' : '/admin/dashboard';
     url.search = '';
     return NextResponse.redirect(url);
   }
 
-  if (isAdmin && role !== 'admin' && role !== 'bos') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/request';
-    url.search = '';
-    return NextResponse.redirect(url);
-  }
-
-  // Wajib pilih proyek yang dikelola (atau "Semua") sebelum masuk area admin.
-  if (isAdmin && (role === 'admin' || role === 'bos')) {
+  // Gate role + redirect pilih proyek ditangani di layout (requireRole) dan
+  // cek cookie ringan di sini — tanpa query ke database per request.
+  if (isAdmin) {
     const managed = request.cookies.get('managed_project')?.value;
     if (!managed && path !== '/admin/projects') {
       const url = request.nextUrl.clone();
