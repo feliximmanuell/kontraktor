@@ -64,8 +64,60 @@ export async function createMaterialUsage(formData: FormData): Promise<ActionRes
   return { success: true };
 }
 
-/** Hapus pemakaian. Stok otomatis dikembalikan via trigger. */
-export async function deleteUsage(usageId: string): Promise<ActionResponse> {
+/**
+ * Edit pemakaian material. Stok otomatis disesuaikan via trigger
+ * (mengembalikan selisih qty lama-baru / menangani perubahan material).
+ */
+export async function updateUsage(
+  usageId: string,
+  input: {
+    project_name: string;
+    material_name: string;
+    qty_used: string;
+    used_for: string;
+    used_at: string;
+  }
+): Promise<ActionResponse> {
+  const ctx = await requireAdmin();
+  if (!ctx) return { error: 'Anda tidak punya akses admin.' };
+
+  const managed = await getManagedProject();
+  const projectName = managed ?? input.project_name.trim();
+  const materialName = input.material_name.trim();
+  const qtyUsed = input.qty_used.trim();
+  const usedFor = input.used_for.trim();
+
+  if (!projectName || !materialName || !qtyUsed || usedFor.length < 3 || !input.used_at) {
+    return { error: 'Isi nama proyek, nama material, jumlah, detail, dan tanggal pemakaian.' };
+  }
+
+  const { data: existing } = await ctx.supabase
+    .from('material_usages')
+    .select('id')
+    .eq('id', usageId)
+    .maybeSingle();
+  if (!existing) return { error: 'Pemakaian tidak ditemukan.' };
+
+  const { error } = await ctx.supabase
+    .from('material_usages')
+    .update({
+      project_name: projectName,
+      material_name: materialName,
+      qty_used: qtyUsed,
+      used_for: usedFor,
+      used_at: input.used_at,
+    })
+    .eq('id', usageId);
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/usage');
+  revalidatePath('/admin/dashboard');
+  revalidatePath('/admin/audit');
+  revalidatePath('/admin/stock');
+  return { success: true };
+}
+
+/** Hapus pemakaian. Stok otomatis dikembalikan via trigger. */export async function deleteUsage(usageId: string): Promise<ActionResponse> {
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 

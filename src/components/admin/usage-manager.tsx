@@ -6,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { createMaterialUsage, deleteUsage } from '@/lib/actions/usages';
+import { createMaterialUsage, deleteUsage, updateUsage } from '@/lib/actions/usages';
 import { MaterialAutocomplete } from '@/components/material-autocomplete';
 import { EmptyState } from '@/components/empty-state';
 import {
@@ -28,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Save, Search, Trash2 } from 'lucide-react';
+import { Loader2, Save, Search, Trash2, Pencil } from 'lucide-react';
 import type { UsageJoined } from '@/lib/types';
 import { formatDateTime } from '@/lib/format';
 
@@ -55,6 +55,15 @@ export function UsageManager({
   const [query, setQuery] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<UsageJoined | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [editTarget, setEditTarget] = useState<UsageJoined | null>(null);
+  const [editForm, setEditForm] = useState({
+    projectName: '',
+    materialName: '',
+    qtyUsed: '',
+    usedFor: '',
+    usedAt: '',
+  });
+  const [editBusy, setEditBusy] = useState(false);
 
   const {
     register,
@@ -102,6 +111,45 @@ export function UsageManager({
     }
     toast.success('Pemakaian dihapus. Stok otomatis dikembalikan.');
     setDeleteTarget(null);
+    router.refresh();
+  }
+
+  function openEdit(u: UsageJoined) {
+    setEditTarget(u);
+    setEditForm({
+      projectName: managedProject ?? u.project_name,
+      materialName: u.material_name,
+      qtyUsed: u.qty_used,
+      usedFor: u.used_for,
+      usedAt: u.used_at.slice(0, 10),
+    });
+  }
+
+  async function confirmEdit() {
+    if (!editTarget) return;
+    const projectName = editForm.projectName.trim();
+    const materialName = editForm.materialName.trim();
+    const qtyUsed = editForm.qtyUsed.trim();
+    const usedFor = editForm.usedFor.trim();
+    if (!projectName || !materialName || !qtyUsed || usedFor.length < 3 || !editForm.usedAt) {
+      toast.error('Data pemakaian tidak lengkap.');
+      return;
+    }
+    setEditBusy(true);
+    const res = await updateUsage(editTarget.id, {
+      project_name: projectName,
+      material_name: materialName,
+      qty_used: qtyUsed,
+      used_for: usedFor,
+      used_at: new Date(editForm.usedAt + 'T00:00:00').toISOString(),
+    });
+    setEditBusy(false);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success('Pemakaian diperbarui.');
+    setEditTarget(null);
     router.refresh();
   }
 
@@ -236,14 +284,24 @@ export function UsageManager({
                       {formatDateTime(u.used_at)}
                     </span>
                     {isAdmin ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(u)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => openEdit(u)}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(u)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -277,6 +335,77 @@ export function UsageManager({
             <Button variant="destructive" onClick={onDelete} disabled={deleteBusy}>
               {deleteBusy ? <Loader2 className="animate-spin" /> : <Trash2 />}
               Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Pemakaian</DialogTitle>
+            <DialogDescription>
+              Perbarui detail pemakaian. Jika material atau jumlah berubah, stok
+              akan disesuaikan otomatis.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="editProjectName">Nama Proyek</Label>
+                <Input
+                  id="editProjectName"
+                  value={editForm.projectName}
+                  readOnly={!!managedProject}
+                  className={managedProject ? 'opacity-70' : undefined}
+                  onChange={(e) => setEditForm((f) => ({ ...f, projectName: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editMaterialName">Nama Material</Label>
+                <Input
+                  id="editMaterialName"
+                  value={editForm.materialName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, materialName: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="editQtyUsed">Jumlah Terpakai</Label>
+                <Input
+                  id="editQtyUsed"
+                  value={editForm.qtyUsed}
+                  onChange={(e) => setEditForm((f) => ({ ...f, qtyUsed: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editUsedAt">Tanggal</Label>
+                <Input
+                  id="editUsedAt"
+                  type="date"
+                  value={editForm.usedAt}
+                  onChange={(e) => setEditForm((f) => ({ ...f, usedAt: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editUsedFor">Digunakan Untuk Apa / Di Mana?</Label>
+              <Textarea
+                id="editUsedFor"
+                rows={3}
+                value={editForm.usedFor}
+                onChange={(e) => setEditForm((f) => ({ ...f, usedFor: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>
+              Batal
+            </Button>
+            <Button onClick={confirmEdit} disabled={editBusy}>
+              {editBusy ? <Loader2 className="animate-spin" /> : <Save />}
+              Simpan Perubahan
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -6,7 +6,7 @@ import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { createPurchase, deletePurchase } from '@/lib/actions/purchases';
+import { createPurchase, deletePurchase, updatePurchase } from '@/lib/actions/purchases';
 import { ReceiptStatusBadge } from '@/components/status-badges';
 import { UploadReceiptDialog } from '@/components/admin/upload-receipt-dialog';
 import { MaterialAutocomplete } from '@/components/material-autocomplete';
@@ -36,7 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Plus, Save, Trash2, UploadCloud } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2, UploadCloud, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PurchaseJoined } from '@/lib/types';
 import { formatIDR, formatDateTime } from '@/lib/format';
@@ -81,6 +81,16 @@ export function PurchaseManager({
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PurchaseJoined | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [editTarget, setEditTarget] = useState<PurchaseJoined | null>(null);
+  const [editForm, setEditForm] = useState({
+    projectName: '',
+    storeName: '',
+    materialName: '',
+    qty: '',
+    totalPrice: '',
+    purchasedAt: '',
+  });
+  const [editBusy, setEditBusy] = useState(false);
 
   const {
     register,
@@ -162,6 +172,48 @@ export function PurchaseManager({
     }
     toast.success('Pembelian dihapus. Stok otomatis dikurangi.');
     setDeleteTarget(null);
+    router.refresh();
+  }
+
+  function openEdit(p: PurchaseJoined) {
+    setEditTarget(p);
+    setEditForm({
+      projectName: managedProject ?? p.project_name,
+      storeName: p.store_name,
+      materialName: p.material_name,
+      qty: p.qty,
+      totalPrice: String(p.total_price),
+      purchasedAt: p.purchased_at.slice(0, 10),
+    });
+  }
+
+  async function confirmEdit() {
+    if (!editTarget) return;
+    const projectName = editForm.projectName.trim();
+    const storeName = editForm.storeName.trim();
+    const materialName = editForm.materialName.trim();
+    const qty = editForm.qty.trim();
+    const totalPrice = Number(editForm.totalPrice);
+    if (!projectName || !storeName || !materialName || !qty || !(totalPrice >= 0) || !editForm.purchasedAt) {
+      toast.error('Data pembelian tidak lengkap.');
+      return;
+    }
+    setEditBusy(true);
+    const res = await updatePurchase(editTarget.id, {
+      project_name: projectName,
+      store_name: storeName,
+      material_name: materialName,
+      qty,
+      total_price: totalPrice,
+      purchased_at: new Date(editForm.purchasedAt + 'T00:00:00').toISOString(),
+    });
+    setEditBusy(false);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success('Pembelian diperbarui.');
+    setEditTarget(null);
     router.refresh();
   }
 
@@ -573,6 +625,10 @@ export function PurchaseManager({
                               purchaseId={p.id}
                               hasReceipt={p.receipt_status === 'received'}
                             />
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>
+                              <Pencil className="size-4" />
+                              Edit
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -611,6 +667,87 @@ export function PurchaseManager({
             <Button variant="destructive" onClick={onDelete} disabled={deleteBusy}>
               {deleteBusy ? <Loader2 className="animate-spin" /> : <Trash2 />}
               Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Pembelian</DialogTitle>
+            <DialogDescription>
+              Perbarui detail pembelian. Jika material atau jumlah berubah, stok
+              akan disesuaikan otomatis.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="editProjectName">Nama Proyek</Label>
+                <Input
+                  id="editProjectName"
+                  value={editForm.projectName}
+                  readOnly={!!managedProject}
+                  className={managedProject ? 'opacity-70' : undefined}
+                  onChange={(e) => setEditForm((f) => ({ ...f, projectName: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editStoreName">Nama Toko</Label>
+                <Input
+                  id="editStoreName"
+                  value={editForm.storeName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, storeName: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editMaterialName">Nama Material</Label>
+              <Input
+                id="editMaterialName"
+                value={editForm.materialName}
+                onChange={(e) => setEditForm((f) => ({ ...f, materialName: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="editQty">Qty</Label>
+                <Input
+                  id="editQty"
+                  value={editForm.qty}
+                  onChange={(e) => setEditForm((f) => ({ ...f, qty: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editTotalPrice">Total Harga (Rp)</Label>
+                <Input
+                  id="editTotalPrice"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={editForm.totalPrice}
+                  onChange={(e) => setEditForm((f) => ({ ...f, totalPrice: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editPurchasedAt">Tanggal</Label>
+                <Input
+                  id="editPurchasedAt"
+                  type="date"
+                  value={editForm.purchasedAt}
+                  onChange={(e) => setEditForm((f) => ({ ...f, purchasedAt: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>
+              Batal
+            </Button>
+            <Button onClick={confirmEdit} disabled={editBusy}>
+              {editBusy ? <Loader2 className="animate-spin" /> : <Save />}
+              Simpan Perubahan
             </Button>
           </DialogFooter>
         </DialogContent>

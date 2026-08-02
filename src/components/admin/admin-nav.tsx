@@ -12,6 +12,7 @@ import {
   BarChart3,
   FileSearch,
   HardHat,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SignOutButton } from '@/components/sign-out-button';
@@ -22,6 +23,7 @@ const links = [
   { href: '/admin/requests', label: 'Pengajuan', icon: ClipboardList },
   { href: '/admin/purchases', label: 'Pembelian', icon: Receipt },
   { href: '/admin/payments', label: 'Pembayaran', icon: Wallet },
+  { href: '/admin/cashflow', label: 'Cashflow', icon: ArrowLeftRight },
   { href: '/admin/stock', label: 'Stok', icon: Boxes },
   { href: '/admin/usage', label: 'Pemakaian', icon: Wrench },
   { href: '/admin/reports', label: 'Laporan', icon: BarChart3 },

@@ -98,8 +98,64 @@ export async function createPurchase(formData: FormData): Promise<ActionResponse
   return { success: true };
 }
 
-/** Unggah bon/nota untuk pembelian yang bonnya belum diterima. */
-export async function uploadReceipt(formData: FormData): Promise<ActionResponse> {
+/**
+ * Edit pembelian (proyek, toko, material, qty, total, tanggal).
+ * Stok otomatis disesuaikan via trigger saat material/qty berubah.
+ */
+export async function updatePurchase(
+  purchaseId: string,
+  input: {
+    project_name: string;
+    store_name: string;
+    material_name: string;
+    qty: string;
+    total_price: number;
+    purchased_at: string;
+  }
+): Promise<ActionResponse> {
+  const ctx = await requireAdmin();
+  if (!ctx) return { error: 'Anda tidak punya akses admin.' };
+
+  const managed = await getManagedProject();
+  const projectName = managed ?? input.project_name.trim();
+  const storeName = input.store_name.trim();
+  const materialName = input.material_name.trim();
+  const qty = input.qty.trim();
+  const totalPrice = Number(input.total_price);
+
+  if (!projectName || !storeName || !materialName || !qty || !(totalPrice >= 0) || !input.purchased_at) {
+    return { error: 'Data pembelian tidak lengkap. Periksa kembali input Anda.' };
+  }
+
+  const { data: existing } = await ctx.supabase
+    .from('purchases')
+    .select('id')
+    .eq('id', purchaseId)
+    .maybeSingle();
+  if (!existing) return { error: 'Pembelian tidak ditemukan.' };
+
+  const { error } = await ctx.supabase
+    .from('purchases')
+    .update({
+      project_name: projectName,
+      store_name: storeName,
+      material_name: materialName,
+      qty,
+      total_price: totalPrice,
+      purchased_at: input.purchased_at,
+    })
+    .eq('id', purchaseId);
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/purchases');
+  revalidatePath('/admin/dashboard');
+  revalidatePath('/admin/audit');
+  revalidatePath('/admin/stock');
+  revalidatePath('/admin/reports');
+  return { success: true };
+}
+
+/** Unggah bon/nota untuk pembelian yang bonnya belum diterima. */export async function uploadReceipt(formData: FormData): Promise<ActionResponse> {
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 

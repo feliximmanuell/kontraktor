@@ -177,3 +177,14 @@ export interface UsageJoined {
   used_at: string;
   logged_by_name: string;
 }
+
+export interface CashflowEntry {
+  id: string;
+  description: string;
+  project_name: string;
+  amount: number;
+  entry_date: string;
+  created_by: string | null;
+  created_at: string;
+  created_by_name: string;
+}
