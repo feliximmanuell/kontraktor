@@ -173,14 +173,6 @@ export function CashflowManager({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Cashflow</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Jurnal keuangan: catat pemasukan, dan pantau pengeluaran yang sudah
-          tercatat (pembelian & pengeluaran manual).
-        </p>
-      </div>
-
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
           <p className="text-xs font-medium text-muted-foreground">Total Pemasukan</p>

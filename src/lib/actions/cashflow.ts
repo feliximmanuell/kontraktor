@@ -55,6 +55,7 @@ export async function createCashflowIncome(input: {
   if (error) return { error: error.message };
 
   revalidatePath('/admin/cashflow');
+  revalidatePath('/admin/reports');
   return { success: true };
 }
 
@@ -99,6 +100,7 @@ export async function updateCashflowIncome(
   if (error) return { error: error.message };
 
   revalidatePath('/admin/cashflow');
+  revalidatePath('/admin/reports');
   return { success: true };
 }
 

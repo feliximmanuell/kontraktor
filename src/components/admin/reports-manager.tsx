@@ -19,7 +19,10 @@ export function ReportsManager({ rows }: { rows: ReportRow[] }) {
     });
   }
 
-  const total = rows.reduce((acc, r) => acc + (r.kind === 'group' ? r.total : r.amount), 0);
+  const totalOut = rows.reduce((acc, r) => acc + (r.kind === 'group' ? r.total : r.amount), 0);
+  const totalIn = rows
+    .filter((r) => r.kind === 'income')
+    .reduce((acc, r) => acc + r.amount, 0);
   const totalPurchase = rows
     .filter((r) => r.kind === 'group')
     .reduce((acc, r) => acc + r.total, 0);
@@ -29,25 +32,33 @@ export function ReportsManager({ rows }: { rows: ReportRow[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+          <p className="text-xs font-medium text-muted-foreground">Total Pemasukan</p>
+          <p className="text-lg font-semibold text-green-700">{formatIDR(totalIn)}</p>
+        </div>
         <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
           <p className="text-xs font-medium text-muted-foreground">Total Pengeluaran</p>
-          <p className="text-lg font-semibold">{formatIDR(total)}</p>
+          <p className="text-lg font-semibold text-destructive">{formatIDR(totalOut)}</p>
         </div>
         <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-          <p className="text-xs font-medium text-muted-foreground">Pembelian</p>
-          <p className="text-lg font-semibold">{formatIDR(totalPurchase)}</p>
+          <p className="text-xs font-medium text-muted-foreground">Saldo</p>
+          <p className="text-lg font-semibold">{formatIDR(totalIn - totalOut)}</p>
         </div>
         <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-          <p className="text-xs font-medium text-muted-foreground">Manual</p>
-          <p className="text-lg font-semibold">{formatIDR(totalManual)}</p>
+          <p className="text-xs font-medium text-muted-foreground">Pembelian vs Manual</p>
+          <p className="text-lg font-semibold">
+            <span className="text-blue-700">{formatIDR(totalPurchase)}</span>
+            <span className="mx-1 text-muted-foreground">/</span>
+            <span className="text-purple-700">{formatIDR(totalManual)}</span>
+          </p>
         </div>
       </div>
 
       {rows.length === 0 ? (
         <EmptyState
           title="Tidak ada data"
-          description="Sesuaikan filter atau catat pengeluaran terlebih dahulu."
+          description="Sesuaikan filter atau catat transaksi terlebih dahulu."
         />
       ) : (
         <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
@@ -88,6 +99,7 @@ function RowGroup({
   onToggle: () => void;
 }) {
   const isGroup = row.kind === 'group';
+  const isIncome = row.kind === 'income';
   return (
     <>
       <tr
@@ -110,11 +122,11 @@ function RowGroup({
           )}
         </td>
         <td className="whitespace-nowrap px-2 py-3 text-muted-foreground">
-          {formatDateTime(row.paid_at)}
+          {formatDateTime(isIncome ? row.entry_date : row.paid_at)}
         </td>
         <td className="px-4 py-3 font-medium">{row.project_name}</td>
         <td className="px-4 py-3">
-          {isGroup ? `${row.items.length} item` : (row.material_name ?? '-')}
+          {isGroup ? `${row.items.length} item` : isIncome ? '-' : (row.material_name ?? '-')}
         </td>
         <td className="px-4 py-3">{row.description}</td>
         <td className="px-4 py-3">
@@ -123,14 +135,18 @@ function RowGroup({
               'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold',
               isGroup
                 ? 'border-blue-300 bg-blue-50 text-blue-700'
-                : 'border-purple-300 bg-purple-50 text-purple-700'
+                : isIncome
+                  ? 'border-green-300 bg-green-50 text-green-700'
+                  : 'border-purple-300 bg-purple-50 text-purple-700'
             )}
           >
-            {isGroup ? 'Pembelian' : 'Manual'}
+            {isGroup ? 'Pembelian' : isIncome ? 'Pemasukan' : 'Manual'}
           </span>
         </td>
         <td className="px-4 py-3 text-right font-semibold">
-          {formatIDR(isGroup ? row.total : row.amount)}
+          <span className={isIncome ? 'text-green-700' : undefined}>
+            {formatIDR(isGroup ? row.total : row.amount)}
+          </span>
         </td>
       </tr>
       {isGroup && isOpen ? (

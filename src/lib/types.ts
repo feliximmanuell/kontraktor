@@ -133,7 +133,16 @@ export interface ReportManualRow {
   amount: number;
 }
 
-export type ReportRow = ReportGroupRow | ReportManualRow;
+export interface ReportIncomeRow {
+  kind: 'income';
+  id: string;
+  entry_date: string;
+  project_name: string;
+  description: string;
+  amount: number;
+}
+
+export type ReportRow = ReportGroupRow | ReportManualRow | ReportIncomeRow;
 
 // ---- Tipe gabungan (join) yang dipakai di UI ----
 

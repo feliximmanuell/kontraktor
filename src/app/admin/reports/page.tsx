@@ -26,20 +26,36 @@ export default async function AdminReportsPage({
 
   const supabase = await createClient();
 
-  let query = supabase
+  let paymentQuery = supabase
     .from('payments')
     .select(
       'id, payment_type, purchase_id, description, project_name, material_name, amount, paid_at'
     );
 
-  if (project) query = query.ilike('project_name', `%${project}%`);
-  if (material) query = query.ilike('material_name', `%${material}%`);
-  if (from) query = query.gte('paid_at', `${from}T00:00:00`);
-  if (to) query = query.lte('paid_at', `${to}T23:59:59`);
-  if (type === 'purchase' || type === 'manual') query = query.eq('payment_type', type);
+  if (project) paymentQuery = paymentQuery.ilike('project_name', `%${project}%`);
+  if (material) paymentQuery = paymentQuery.ilike('material_name', `%${material}%`);
+  if (from) paymentQuery = paymentQuery.gte('paid_at', `${from}T00:00:00`);
+  if (to) paymentQuery = paymentQuery.lte('paid_at', `${to}T23:59:59`);
+  if (type === 'purchase' || type === 'manual') paymentQuery = paymentQuery.eq('payment_type', type);
 
-  const { data } = await query;
-  const payments = (data ?? []) as unknown as {
+  let incomeQuery = supabase
+    .from('cashflow')
+    .select('id, description, project_name, amount, entry_date');
+
+  if (project) incomeQuery = incomeQuery.ilike('project_name', `%${project}%`);
+  if (from) incomeQuery = incomeQuery.gte('entry_date', `${from}T00:00:00`);
+  if (to) incomeQuery = incomeQuery.lte('entry_date', `${to}T23:59:59`);
+  if (type === 'pemasukan') {
+    // biarkan incomeQuery apa adanya (semua pemasukan)
+  } else if (type === 'purchase' || type === 'manual') {
+    incomeQuery = incomeQuery.eq('project_name', '__none__'); // saring habis
+  }
+
+  const [{ data: paymentsData }, { data: incomesData }] = await Promise.all([
+    paymentQuery,
+    incomeQuery,
+  ]);
+  const payments = (paymentsData ?? []) as unknown as {
     id: string;
     payment_type: 'purchase' | 'manual';
     purchase_id: string | null;
@@ -127,6 +143,25 @@ export default async function AdminReportsPage({
     rows.push(g);
   }
 
+  // Pemasukan dari tabel cashflow masuk ke laporan.
+  for (const i of incomesData ?? []) {
+    const row = i as unknown as {
+      id: string;
+      description: string;
+      project_name: string;
+      amount: number;
+      entry_date: string;
+    };
+    rows.push({
+      kind: 'income',
+      id: `in-${row.id}`,
+      entry_date: row.entry_date,
+      project_name: row.project_name,
+      description: row.description,
+      amount: Number(row.amount ?? 0),
+    });
+  }
+
   rows.sort((a, b) => {
     let av: string;
     let bv: string;
@@ -134,11 +169,21 @@ export default async function AdminReportsPage({
       av = a.project_name;
       bv = b.project_name;
     } else if (sort === 'material_name') {
-      av = a.kind === 'group' ? a.items[0]?.material_name ?? '' : a.material_name ?? '';
-      bv = b.kind === 'group' ? b.items[0]?.material_name ?? '' : b.material_name ?? '';
+      av =
+        a.kind === 'group'
+          ? a.items[0]?.material_name ?? ''
+          : a.kind === 'income'
+            ? a.description
+            : a.material_name ?? '';
+      bv =
+        b.kind === 'group'
+          ? b.items[0]?.material_name ?? ''
+          : b.kind === 'income'
+            ? b.description
+            : b.material_name ?? '';
     } else {
-      av = a.paid_at;
-      bv = b.paid_at;
+      av = a.kind === 'income' ? a.entry_date : a.paid_at;
+      bv = b.kind === 'income' ? b.entry_date : b.paid_at;
     }
     return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
   });
@@ -146,8 +191,8 @@ export default async function AdminReportsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Laporan Pengeluaran"
-        description="Filter dan urutkan pengeluaran berdasarkan proyek, material, atau tanggal. Klik panah untuk melihat rincian pembelian."
+        title="Laporan Keuangan"
+        description="Semua arus uang keluar masuk: pemasukan, pembayaran pembelian, dan pengeluaran manual. Klik panah untuk melihat rincian pembelian."
       />
 
       <form method="get" className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
@@ -180,6 +225,7 @@ export default async function AdminReportsPage({
               className="h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none"
             >
               <option value="">Semua</option>
+              <option value="pemasukan">Pemasukan</option>
               <option value="purchase">Pembelian</option>
               <option value="manual">Manual</option>
             </select>
