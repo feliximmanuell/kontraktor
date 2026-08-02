@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { getManagedProject } from '@/lib/projects';
 
 export type ActionResponse = {
   success?: boolean;
@@ -32,7 +33,8 @@ export async function createMaterialUsage(formData: FormData): Promise<ActionRes
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 
-  const projectName = String(formData.get('projectName') ?? '').trim();
+  const managed = await getManagedProject();
+  const projectName = managed ?? String(formData.get('projectName') ?? '').trim();
   const materialName = String(formData.get('materialName') ?? '').trim();
   const qtyUsed = String(formData.get('qtyUsed') ?? '').trim();
   const usedFor = String(formData.get('usedFor') ?? '').trim();

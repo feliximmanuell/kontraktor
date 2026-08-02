@@ -1,5 +1,6 @@
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { getManagedProject } from '@/lib/projects';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
 import { RequestStatusBadge, ReceiptStatusBadge } from '@/components/status-badges';
@@ -50,6 +51,8 @@ export default async function AdminAuditPage({
   await requireRole(['admin', 'bos']);
   const { project } = await searchParams;
   const supabase = await createClient();
+  const managed = await getManagedProject();
+  const effectiveProject = managed ?? project ?? '';
 
   const [{ data: requests }, { data: purchases }, { data: usages }] = await Promise.all([
     supabase
@@ -139,8 +142,8 @@ export default async function AdminAuditPage({
   }
 
   const projectNames = Object.keys(grouped);
-  const visible = project
-    ? projectNames.filter((name) => name === project)
+  const visible = effectiveProject
+    ? projectNames.filter((name) => name === effectiveProject)
     : projectNames;
 
   return (
@@ -149,26 +152,32 @@ export default async function AdminAuditPage({
         title="Audit Trail"
         description="Jejak lengkap Pengajuan → Pembelian → Pemakaian per proyek."
       >
-        <form className="flex items-center gap-2" method="get">
-          <select
-            name="project"
-            defaultValue={project ?? ''}
-            className="h-8 rounded-lg border bg-background px-2 text-sm outline-none"
-          >
-            <option value="">Semua Proyek</option>
-            {projectNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="h-8 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
-          >
-            Filter
-          </button>
-        </form>
+        {managed ? (
+          <span className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
+            Proyek: <span className="ml-1 font-semibold text-foreground">{managed}</span>
+          </span>
+        ) : (
+          <form className="flex items-center gap-2" method="get">
+            <select
+              name="project"
+              defaultValue={project ?? ''}
+              className="h-8 rounded-lg border bg-background px-2 text-sm outline-none"
+            >
+              <option value="">Semua Proyek</option>
+              {projectNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="h-8 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
+            >
+              Filter
+            </button>
+          </form>
+        )}
       </PageHeader>
 
       {visible.length === 0 ? (

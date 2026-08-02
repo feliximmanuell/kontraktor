@@ -1,5 +1,6 @@
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { getManagedProject } from '@/lib/projects';
 import { PurchaseManager } from '@/components/admin/purchase-manager';
 import type { PurchaseJoined } from '@/lib/types';
 
@@ -7,18 +8,26 @@ export default async function AdminPurchasesPage() {
   const profile = await requireRole(['admin', 'bos']);
   const supabase = await createClient();
   const isAdmin = profile.role === 'admin';
+  const managed = await getManagedProject();
+
+  let purchasesQ = supabase
+    .from('purchases')
+    .select(
+      'id, request_id, project_name, material_name, store_name, qty, total_price, paid, receipt_status, receipt_image_url, purchased_by, purchased_at'
+    )
+    .order('purchased_at', { ascending: false });
+  let approvedQ = supabase
+    .from('material_requests')
+    .select('id, project_name, material_name, requested_qty, status')
+    .eq('status', 'approved');
+  if (managed) {
+    purchasesQ = purchasesQ.eq('project_name', managed);
+    approvedQ = approvedQ.eq('project_name', managed);
+  }
 
   const [{ data: purchases }, { data: approved }] = await Promise.all([
-    supabase
-      .from('purchases')
-      .select(
-        'id, request_id, project_name, material_name, store_name, qty, total_price, paid, receipt_status, receipt_image_url, purchased_by, purchased_at'
-      )
-      .order('purchased_at', { ascending: false }),
-    supabase
-      .from('material_requests')
-      .select('id, project_name, material_name, requested_qty, status')
-      .eq('status', 'approved'),
+    purchasesQ,
+    approvedQ,
   ]);
 
   // Pengajuan disetujui yang belum memiliki catatan pembelian (cegah double buying).
@@ -92,6 +101,11 @@ export default async function AdminPurchasesPage() {
   }
 
   return (
-    <PurchaseManager requests={requestOptions} purchases={purchaseRows} isAdmin={isAdmin} />
+    <PurchaseManager
+      requests={requestOptions}
+      purchases={purchaseRows}
+      isAdmin={isAdmin}
+      managedProject={managed}
+    />
   );
 }

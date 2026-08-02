@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -69,10 +69,12 @@ export function PurchaseManager({
   requests,
   purchases,
   isAdmin,
+  managedProject,
 }: {
   requests: ApprovedRequestOption[];
   purchases: PurchaseJoined[];
   isAdmin: boolean;
+  managedProject: string | null;
 }) {
   const router = useRouter();
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -97,6 +99,11 @@ export function PurchaseManager({
       items: [{ materialName: '', qty: '', totalPrice: undefined as unknown as number }],
     },
   });
+
+  useEffect(() => {
+    if (managedProject) setValue('projectName', managedProject);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [managedProject]);
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
@@ -305,8 +312,15 @@ export function PurchaseManager({
                   <Input
                     id="projectName"
                     placeholder="Cth: Rumah Pak Haji Jamil"
+                    readOnly={!!managedProject}
+                    className={managedProject ? 'opacity-70' : undefined}
                     {...register('projectName')}
                   />
+                  {managedProject ? (
+                    <p className="text-xs text-muted-foreground">
+                      Terkunci ke proyek: {managedProject}
+                    </p>
+                  ) : null}
                   {errors.projectName ? (
                     <p className="text-xs text-destructive">{errors.projectName.message}</p>
                   ) : null}

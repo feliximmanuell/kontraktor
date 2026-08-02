@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -63,10 +63,12 @@ export function PaymentsManager({
   unpaid,
   payments,
   isAdmin,
+  managedProject,
 }: {
   unpaid: UnpaidPurchase[];
   payments: PaymentJoined[];
   isAdmin: boolean;
+  managedProject: string | null;
 }) {
   const router = useRouter();
   const [payTarget, setPayTarget] = useState<UnpaidGroup | null>(null);
@@ -91,6 +93,7 @@ export function PaymentsManager({
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<ManualValues>({
     resolver: zodResolver(manualSchema),
@@ -102,6 +105,11 @@ export function PaymentsManager({
       paidAt: todayInput(),
     },
   });
+
+  useEffect(() => {
+    if (managedProject) setValue('projectName', managedProject);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [managedProject]);
 
   const unpaidGroups: UnpaidGroup[] = Array.from(
     unpaid
@@ -132,7 +140,7 @@ export function PaymentsManager({
     setEditTarget(p);
     setEditForm({
       description: p.description,
-      projectName: p.project_name,
+      projectName: managedProject ?? p.project_name,
       materialName: p.material_name ?? '',
       amount: String(p.amount),
       paidAt: p.paid_at.slice(0, 10),
@@ -342,8 +350,15 @@ export function PaymentsManager({
                     <Input
                       id="projectName"
                       placeholder="Cth: Rumah Pak Haji Jamil"
+                      readOnly={!!managedProject}
+                      className={managedProject ? 'opacity-70' : undefined}
                       {...register('projectName')}
                     />
+                    {managedProject ? (
+                      <p className="text-xs text-muted-foreground">
+                        Terkunci ke proyek: {managedProject}
+                      </p>
+                    ) : null}
                     {errors.projectName ? (
                       <p className="text-xs text-destructive">{errors.projectName.message}</p>
                     ) : null}
@@ -552,6 +567,8 @@ export function PaymentsManager({
                 <Input
                   id="editProjectName"
                   value={editForm.projectName}
+                  readOnly={!!managedProject}
+                  className={managedProject ? 'opacity-70' : undefined}
                   onChange={(e) =>
                     setEditForm((f) => ({ ...f, projectName: e.target.value }))
                   }

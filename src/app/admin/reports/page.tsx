@@ -1,5 +1,6 @@
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { getManagedProject } from '@/lib/projects';
 import { PageHeader } from '@/components/page-header';
 import { ReportsManager } from '@/components/admin/reports-manager';
 import type { ReportGroupRow, ReportRow } from '@/lib/types';
@@ -14,7 +15,8 @@ export default async function AdminReportsPage({
 }) {
   await requireRole(['admin', 'bos']);
   const sp = await searchParams;
-  const project = sp.project?.trim() ?? '';
+  const managed = await getManagedProject();
+  const project = managed ?? sp.project?.trim() ?? '';
   const material = sp.material?.trim() ?? '';
   const from = sp.from ?? '';
   const to = sp.to ?? '';
@@ -155,8 +157,10 @@ export default async function AdminReportsPage({
             <input
               name="project"
               defaultValue={project}
+              readOnly={!!managed}
               placeholder="Cth: Rumah Pak Haji Jamil"
-              className="h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+              className="h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-70"
+              disabled={!!managed}
             />
           </div>
           <div className="space-y-1 lg:col-span-2">

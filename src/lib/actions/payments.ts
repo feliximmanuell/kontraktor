@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { getManagedProject } from '@/lib/projects';
 
 export type ActionResponse = {
   success?: boolean;
@@ -109,8 +110,9 @@ export async function createManualPayment(input: {
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 
+  const managed = await getManagedProject();
   const description = input.description.trim();
-  const projectName = input.project_name.trim();
+  const projectName = managed ?? input.project_name.trim();
   const materialName = input.material_name?.trim() ?? '';
   const amount = Number(input.amount);
 
@@ -149,8 +151,9 @@ export async function updatePayment(
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 
+  const managed = await getManagedProject();
   const description = input.description.trim();
-  const projectName = input.project_name.trim();
+  const projectName = managed ?? input.project_name.trim();
   const materialName = input.material_name?.trim() ?? '';
   const amount = Number(input.amount);
 

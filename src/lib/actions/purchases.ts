@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { getManagedProject } from '@/lib/projects';
 
 export type ActionResponse = {
   success?: boolean;
@@ -34,7 +35,8 @@ export async function createPurchase(formData: FormData): Promise<ActionResponse
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 
-  const projectName = String(formData.get('projectName') ?? '').trim();
+  const managed = await getManagedProject();
+  const projectName = managed ?? String(formData.get('projectName') ?? '').trim();
   const storeName = String(formData.get('storeName') ?? '').trim();
   const requestId = String(formData.get('requestId') ?? '') || null;
   const file = (formData.get('receipt') as File | null) ?? null;

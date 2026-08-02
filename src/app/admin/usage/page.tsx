@@ -1,16 +1,20 @@
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { getManagedProject } from '@/lib/projects';
 import { UsageManager } from '@/components/admin/usage-manager';
 import type { UsageJoined } from '@/lib/types';
 
 export default async function AdminUsagePage() {
   const profile = await requireRole(['admin', 'bos']);
   const supabase = await createClient();
+  const managed = await getManagedProject();
 
-  const { data: usages } = await supabase
+  let query = supabase
     .from('material_usages')
     .select('id, project_name, material_name, qty_used, used_for, logged_by, used_at')
     .order('used_at', { ascending: false });
+  if (managed) query = query.eq('project_name', managed);
+  const { data: usages } = await query;
 
   const loggedByIds = Array.from(
     new Set(
@@ -42,5 +46,5 @@ export default async function AdminUsagePage() {
     };
   });
 
-  return <UsageManager usages={usageRows} isAdmin={profile.role === 'admin'} />;
+  return <UsageManager usages={usageRows} isAdmin={profile.role === 'admin'} managedProject={managed} />;
 }

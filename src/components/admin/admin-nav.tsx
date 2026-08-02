@@ -28,7 +28,15 @@ const links = [
   { href: '/admin/audit', label: 'Audit', icon: FileSearch },
 ];
 
-export function AdminNav({ role, fullName }: { role: Role; fullName: string }) {
+export function AdminNav({
+  role,
+  fullName,
+  managedProject,
+}: {
+  role: Role;
+  fullName: string;
+  managedProject: string | null;
+}) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
@@ -42,6 +50,18 @@ export function AdminNav({ role, fullName }: { role: Role; fullName: string }) {
             <p className="text-xs text-muted-foreground">Portal {role === 'bos' ? 'Bos' : 'Admin'}</p>
           </div>
         </div>
+        <Link
+          href="/admin/projects"
+          className="mx-3 my-1 flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs transition-colors hover:bg-muted"
+        >
+          <span className="min-w-0">
+            <span className="block text-muted-foreground">Proyek aktif</span>
+            <span className="block truncate font-medium text-foreground">
+              {managedProject ?? 'Semua Proyek'}
+            </span>
+          </span>
+          <span className="shrink-0 font-medium text-primary">Ganti</span>
+        </Link>
         <nav className="flex-1 space-y-1 p-3">
           {links.map((l) => (
             <Link
@@ -66,12 +86,17 @@ export function AdminNav({ role, fullName }: { role: Role; fullName: string }) {
       </aside>
 
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-card px-4 lg:hidden">
-        <div className="flex items-center gap-2">
-          <HardHat className="size-5" />
-          <span className="text-sm font-semibold">Material Audit</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <HardHat className="size-5 shrink-0" />
+          <Link href="/admin/projects" className="min-w-0">
+            <span className="block truncate text-sm font-semibold">Material Audit</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {managedProject ? `Proyek: ${managedProject}` : 'Semua Proyek'} · Ganti
+            </span>
+          </Link>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground">{fullName}</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">{fullName}</span>
           <SignOutButton className="px-2" />
         </div>
       </header>

@@ -1,18 +1,22 @@
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { getManagedProject } from '@/lib/projects';
 import { RequestsBoard } from '@/components/admin/requests-board';
 import type { RequestJoined } from '@/lib/types';
 
 export default async function AdminRequestsPage() {
   const profile = await requireRole(['admin', 'bos']);
   const supabase = await createClient();
+  const managed = await getManagedProject();
 
-  const { data } = await supabase
+  let query = supabase
     .from('material_requests')
     .select(
       'id, project_name, requester_id, material_name, requested_qty, notes, status, is_flagged_duplicate, created_at'
     )
     .order('created_at', { ascending: false });
+  if (managed) query = query.eq('project_name', managed);
+  const { data } = await query;
 
   const rows = data ?? [];
 

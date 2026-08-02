@@ -65,5 +65,16 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Wajib pilih proyek yang dikelola (atau "Semua") sebelum masuk area admin.
+  if (isAdmin && (role === 'admin' || role === 'bos')) {
+    const managed = request.cookies.get('managed_project')?.value;
+    if (!managed && path !== '/admin/projects') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/admin/projects';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+  }
+
   return response;
 }

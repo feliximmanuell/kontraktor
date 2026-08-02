@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -44,9 +44,11 @@ type FormValues = z.infer<typeof schema>;
 export function UsageManager({
   usages,
   isAdmin,
+  managedProject,
 }: {
   usages: UsageJoined[];
   isAdmin: boolean;
+  managedProject: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -59,11 +61,17 @@ export function UsageManager({
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { projectName: '', materialName: '', qtyUsed: '', usedFor: '' },
   });
+
+  useEffect(() => {
+    if (managedProject) setValue('projectName', managedProject);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [managedProject]);
 
   async function onSubmit(values: FormValues) {
     setBusy(true);
@@ -131,8 +139,15 @@ export function UsageManager({
                   <Input
                     id="projectName"
                     placeholder="Cth: Rumah Pak Haji Jamil"
+                    readOnly={!!managedProject}
+                    className={managedProject ? 'opacity-70' : undefined}
                     {...register('projectName')}
                   />
+                  {managedProject ? (
+                    <p className="text-xs text-muted-foreground">
+                      Terkunci ke proyek: {managedProject}
+                    </p>
+                  ) : null}
                   {errors.projectName ? (
                     <p className="text-xs text-destructive">{errors.projectName.message}</p>
                   ) : null}

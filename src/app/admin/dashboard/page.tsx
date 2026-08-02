@@ -1,5 +1,6 @@
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { getManagedProject } from '@/lib/projects';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
 import { RequestStatusBadge } from '@/components/status-badges';
@@ -9,18 +10,23 @@ import { Banknote, Boxes, ClipboardList, FileWarning } from 'lucide-react';
 export default async function AdminDashboardPage() {
   await requireRole(['admin', 'bos']);
   const supabase = await createClient();
+  const managed = await getManagedProject();
 
-  const [{ data: purchases }, { data: pendingReq }, { data: recentReq }] = await Promise.all([
-    supabase
-      .from('purchases')
-      .select('project_name, total_price, receipt_status'),
-    supabase.from('material_requests').select('id').eq('status', 'pending'),
-    supabase
-      .from('material_requests')
-      .select('id, project_name, material_name, requested_qty, notes, status, created_at')
-      .order('created_at', { ascending: false })
-      .limit(6),
-  ]);
+  let purchasesQ = supabase.from('purchases').select('project_name, total_price, receipt_status');
+  let pendingReqQ = supabase.from('material_requests').select('id').eq('status', 'pending');
+  let recentReqQ = supabase
+    .from('material_requests')
+    .select('id, project_name, material_name, requested_qty, notes, status, created_at')
+    .order('created_at', { ascending: false })
+    .limit(6);
+  if (managed) {
+    purchasesQ = purchasesQ.eq('project_name', managed);
+    pendingReqQ = pendingReqQ.eq('project_name', managed);
+    recentReqQ = recentReqQ.eq('project_name', managed);
+  }
+
+  const [{ data: purchases }, { data: pendingReq }, { data: recentReq }] =
+    await Promise.all([purchasesQ, pendingReqQ, recentReqQ]);
 
   const totalSpent = (purchases ?? []).reduce(
     (acc, p) => acc + Number((p as { total_price: number }).total_price ?? 0),
@@ -52,7 +58,13 @@ export default async function AdminDashboardPage() {
       <PageHeader
         title="Dashboard Audit"
         description="Ringkasan belanja material dan pengajuan terbaru."
-      />
+      >
+        {managed ? (
+          <span className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
+            Proyek: <span className="ml-1 font-semibold text-foreground">{managed}</span>
+          </span>
+        ) : null}
+      </PageHeader>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map((k) => (
