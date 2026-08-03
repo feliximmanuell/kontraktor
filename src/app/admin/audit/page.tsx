@@ -58,7 +58,7 @@ export default async function AdminAuditPage({
     supabase
       .from('material_requests')
       .select(
-        'id, project_name, material_name, requested_qty, notes, status, created_at, requester_id'
+        'id, project_name, material_name, requested_qty, notes, status, created_at, requester_id, requester_name'
       )
       .order('created_at', { ascending: false }),
     supabase
@@ -106,7 +106,9 @@ export default async function AdminAuditPage({
     if (!grouped[key]) grouped[key] = { requests: [], purchases: [], usages: [] };
     grouped[key].requests.push({
       ...row,
-      requester_name: row.requester_id ? nameMap.get(row.requester_id) ?? '-' : 'Publik',
+      requester_name:
+        (row as { requester_name?: string | null }).requester_name?.trim() ||
+        (row.requester_id ? nameMap.get(row.requester_id) ?? '-' : 'Publik'),
     });
   }
 

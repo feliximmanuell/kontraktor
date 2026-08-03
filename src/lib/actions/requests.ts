@@ -20,6 +20,7 @@ export async function createMaterialRequest(
   const projectName = String(formData.get('projectName') ?? '').trim();
   const materialName = String(formData.get('materialName') ?? '').trim();
   const requestedQty = String(formData.get('requestedQty') ?? '').trim();
+  const requesterName = String(formData.get('requesterName') ?? '').trim();
   const notes = String(formData.get('notes') ?? '').trim();
 
   if (!projectName || !materialName || !requestedQty) {
@@ -32,6 +33,7 @@ export async function createMaterialRequest(
     material_id: null,
     material_name: materialName,
     requester_id: null,
+    requester_name: requesterName || null,
     requested_qty: requestedQty,
     notes: notes || null,
   });

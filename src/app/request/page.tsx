@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 const schema = z.object({
   projectName: z.string().min(1, 'Nama proyek wajib diisi'),
+  requesterName: z.string().min(1, 'Nama Anda wajib diisi'),
   materialName: z.string().min(1, 'Nama material wajib diisi'),
   requestedQty: z.string().min(1, 'Jumlah wajib diisi'),
   notes: z.string().max(500, 'Catatan maksimal 500 karakter').optional(),
@@ -42,7 +43,13 @@ export default function RequestPage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { projectName: '', materialName: '', requestedQty: '', notes: '' },
+    defaultValues: {
+      projectName: '',
+      requesterName: '',
+      materialName: '',
+      requestedQty: '',
+      notes: '',
+    },
   });
 
   async function onSubmit(values: FormValues) {
@@ -51,6 +58,7 @@ export default function RequestPage() {
 
     const formData = new FormData();
     formData.set('projectName', values.projectName);
+    formData.set('requesterName', values.requesterName);
     formData.set('materialName', values.materialName);
     formData.set('requestedQty', values.requestedQty);
     formData.set('notes', values.notes ?? '');
@@ -97,6 +105,19 @@ export default function RequestPage() {
               />
               {errors.projectName ? (
                 <p className="text-xs text-destructive">{errors.projectName.message}</p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="requesterName">Nama Pengaju</Label>
+              <Input
+                id="requesterName"
+                placeholder="Cth: Pak Budi, Kang Eko"
+                className="h-12 text-base"
+                {...register('requesterName')}
+              />
+              {errors.requesterName ? (
+                <p className="text-xs text-destructive">{errors.requesterName.message}</p>
               ) : null}
             </div>
 

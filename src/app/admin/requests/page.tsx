@@ -12,7 +12,7 @@ export default async function AdminRequestsPage() {
   let query = supabase
     .from('material_requests')
     .select(
-      'id, project_name, requester_id, material_name, requested_qty, notes, status, is_flagged_duplicate, created_at'
+      'id, project_name, requester_id, requester_name, material_name, requested_qty, notes, status, is_flagged_duplicate, created_at'
     )
     .order('created_at', { ascending: false });
   if (managed) query = query.eq('project_name', managed);
@@ -40,6 +40,7 @@ export default async function AdminRequestsPage() {
       id: string;
       project_name: string;
       requester_id: string | null;
+      requester_name: string | null;
       material_name: string;
       requested_qty: string;
       notes: string | null;
@@ -57,7 +58,9 @@ export default async function AdminRequestsPage() {
       status: row.status,
       is_flagged_duplicate: row.is_flagged_duplicate,
       created_at: row.created_at,
-      requester_name: row.requester_id ? nameMap.get(row.requester_id) ?? 'Pengguna' : 'Publik',
+      requester_name:
+        row.requester_name?.trim() ||
+        (row.requester_id ? nameMap.get(row.requester_id) ?? 'Pengguna' : 'Tanpa nama'),
     };
   });
 
