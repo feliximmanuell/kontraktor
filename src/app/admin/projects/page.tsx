@@ -1,7 +1,10 @@
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { requireRole } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { selectProject } from '@/lib/actions/projects';
+import { DeleteProjectButton } from '@/components/admin/delete-project-button';
 import { Layers, FolderOpen, Plus } from 'lucide-react';
 
 export default async function AdminProjectsPage() {
@@ -48,16 +51,21 @@ export default async function AdminProjectsPage() {
         {names.map((name) => (
           <form key={name} action={selectProject}>
             <input type="hidden" name="project" value={name} />
-            <button
-              type="submit"
-              className="flex w-full flex-col items-start gap-3 rounded-xl bg-card p-4 text-left ring-1 ring-foreground/10 transition-colors hover:bg-primary hover:text-primary-foreground"
-            >
-              <FolderOpen className="size-6" />
-              <div>
-                <p className="font-semibold">{name}</p>
-                <p className="text-sm opacity-80">Kelola proyek ini saja.</p>
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="submit"
+                className="flex min-w-0 flex-1 flex-col items-start gap-3 rounded-xl bg-card p-4 text-left ring-1 ring-foreground/10 transition-colors hover:bg-primary hover:text-primary-foreground"
+              >
+                <FolderOpen className="size-6" />
+                <div>
+                  <p className="font-semibold">{name}</p>
+                  <p className="text-sm opacity-80">Kelola proyek ini saja.</p>
+                </div>
+              </button>
+              <div className="pt-3 pr-2">
+                <DeleteProjectButton projectName={name} />
               </div>
-            </button>
+            </div>
           </form>
         ))}
       </div>

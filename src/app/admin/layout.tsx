@@ -16,7 +16,7 @@ export default async function AdminLayout({
         fullName={profile.full_name}
         managedProject={managedProject}
       />
-      <main className="px-4 pb-24 pt-6 sm:px-6 lg:pb-10 lg:pl-[264px] lg:pr-8">
+      <main className="px-4 pb-16 pt-6 sm:px-6 lg:pb-10 lg:pl-[264px] lg:pr-8">
         <div className="mx-auto w-full max-w-6xl">{children}</div>
       </main>
     </div>

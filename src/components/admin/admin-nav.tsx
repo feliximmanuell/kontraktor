@@ -103,13 +103,13 @@ export function AdminNav({
         </div>
       </header>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card lg:hidden">
+      <nav className="no-scrollbar fixed inset-x-0 bottom-0 z-30 flex items-stretch overflow-x-auto border-t bg-card lg:hidden">
         {links.map((l) => (
           <Link
             key={l.href}
             href={l.href}
             className={cn(
-              'flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium',
+              'flex min-w-max shrink-0 flex-col items-center gap-0.5 px-4 py-2 text-[10px] font-medium',
               isActive(l.href) ? 'text-primary' : 'text-muted-foreground'
             )}
           >
