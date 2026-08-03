@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { PROFILE_COOKIE, encodeProfile } from '@/lib/session';
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -60,6 +61,26 @@ export async function updateSession(request: NextRequest) {
   // Gate role + redirect pilih proyek ditangani di layout (requireRole) dan
   // cek cookie ringan di sini — tanpa query ke database per request.
   if (isAdmin) {
+    // Cache profil dari DB ke cookie untuk menghindari round-trip getUser() +
+    // query users_profile berulang di server component tiap navigasi.
+    const { data: profileRow } = await supabase
+      .from('users_profile')
+      .select('id, user_id, full_name, role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const payload = {
+      id: profileRow?.id ?? null,
+      user_id: user.id,
+      full_name: profileRow?.full_name ?? null,
+      role: profileRow?.role ?? 'tukang',
+    } as { id: string | null; user_id: string; full_name: string | null; role: 'tukang' | 'admin' | 'bos' };
+    response.cookies.set(PROFILE_COOKIE, encodeProfile(payload), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24,
+    });
+
     const managed = request.cookies.get('managed_project')?.value;
     if (!managed && path !== '/admin/projects') {
       const url = request.nextUrl.clone();

@@ -1,6 +1,8 @@
 import { cache } from 'react';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { PROFILE_COOKIE, decodeProfile } from '@/lib/session';
 
 export type Role = 'tukang' | 'admin' | 'bos';
 
@@ -17,6 +19,23 @@ export interface AuthProfile {
  * bukan berulang kali (menghemat beberapa round-trip jaringan ke Supabase).
  */
 export const getAuthProfile = cache(async (): Promise<AuthProfile | null> => {
+  // Profil sudah divalidasi middleware pada tiap request (getUser + query DB).
+  // Baca dari cookie untuk menghindari round-trip jaringan berulang.
+  const store = await cookies();
+  const raw = store.get(PROFILE_COOKIE)?.value;
+  if (raw) {
+    const p = decodeProfile(raw);
+    if (p) {
+      return {
+        id: p.id ?? '',
+        user_id: p.user_id,
+        full_name: p.full_name ?? '',
+        role: p.role,
+      };
+    }
+  }
+
+  // Fallback: cookie belum ada (mis. request pertama setelah login).
   const supabase = await createClient();
   const {
     data: { user },
