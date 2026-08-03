@@ -1,7 +1,5 @@
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { requireRole } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { selectProject } from '@/lib/actions/projects';
 import { DeleteProjectButton } from '@/components/admin/delete-project-button';
