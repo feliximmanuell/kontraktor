@@ -91,7 +91,7 @@ export function AdminNav({
         <div className="flex min-w-0 items-center gap-2">
           <HardHat className="size-5 shrink-0" />
           <Link href="/admin/projects" className="min-w-0">
-            <span className="block truncate text-sm font-semibold">Material Audit</span>
+            <span className="block truncate text-sm font-semibold">Material Audit made for Zelysca</span>
             <span className="block truncate text-xs text-muted-foreground">
               {managedProject ? `Proyek: ${managedProject}` : 'Semua Proyek'} · Ganti
             </span>
