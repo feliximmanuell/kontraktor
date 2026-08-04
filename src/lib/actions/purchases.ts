@@ -247,6 +247,13 @@ export async function deletePurchase(purchaseId: string): Promise<ActionResponse
     await ctx.supabase.storage.from('receipts').remove([existing.receipt_image_url]);
   }
 
+  // Hapus bukti pembayaran terkait agar tidak tersisa sebagai pengeluaran yatim.
+  const { error: payErr } = await ctx.supabase
+    .from('payments')
+    .delete()
+    .eq('purchase_id', purchaseId);
+  if (payErr) return { error: payErr.message };
+
   const { error } = await ctx.supabase.from('purchases').delete().eq('id', purchaseId);
   if (error) return { error: error.message };
 
@@ -255,5 +262,8 @@ export async function deletePurchase(purchaseId: string): Promise<ActionResponse
   revalidatePath('/admin/audit');
   revalidatePath('/admin/stock');
   revalidatePath('/admin/requests');
+  revalidatePath('/admin/payments');
+  revalidatePath('/admin/reports');
+  revalidatePath('/admin/cashflow');
   return { success: true };
 }

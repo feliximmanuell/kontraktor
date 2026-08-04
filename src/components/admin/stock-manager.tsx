@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { adjustStock } from '@/lib/actions/stocks';
+import { adjustStock, deleteStock } from '@/lib/actions/stocks';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, PencilLine } from 'lucide-react';
+import { Loader2, PencilLine, Trash2 } from 'lucide-react';
 import type { MaterialStock } from '@/lib/types';
 import { formatDateTime } from '@/lib/format';
 
@@ -31,6 +31,8 @@ export function StockManager({
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<MaterialStock | null>(null);
   const [newValue, setNewValue] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<MaterialStock | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   function openDialog(s: MaterialStock) {
     setEditing(s);
@@ -53,6 +55,20 @@ export function StockManager({
     }
     toast.success(`Stok "${editing.material_name}" diperbarui.`);
     setEditing(null);
+    router.refresh();
+  }
+
+  async function onDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    const res = await deleteStock(deleteTarget.material_name);
+    setDeleteBusy(false);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success(`Stok "${deleteTarget.material_name}" dihapus.`);
+    setDeleteTarget(null);
     router.refresh();
   }
 
@@ -93,10 +109,20 @@ export function StockManager({
                   </td>
                   {isAdmin ? (
                     <td className="px-4 py-3">
-                      <Button variant="outline" size="sm" onClick={() => openDialog(s)}>
-                        <PencilLine />
-                        Sesuaikan
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="outline" size="sm" onClick={() => openDialog(s)}>
+                          <PencilLine />
+                          Sesuaikan
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(s)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     </td>
                   ) : null}
                 </tr>
@@ -132,6 +158,28 @@ export function StockManager({
             <Button onClick={onSave} disabled={busy}>
               {busy ? <Loader2 className="animate-spin" /> : null}
               Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Stok?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget
+                ? `Hapus stok "${deleteTarget.material_name}"? Material akan muncul kembali otomatis saat pembelian berikutnya.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={onDelete} disabled={deleteBusy}>
+              {deleteBusy ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Hapus
             </Button>
           </DialogFooter>
         </DialogContent>

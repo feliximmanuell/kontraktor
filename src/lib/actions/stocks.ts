@@ -51,3 +51,26 @@ export async function adjustStock(
   revalidatePath('/admin/requests');
   return { success: true };
 }
+
+/**
+ * Hapus baris stok material. Material akan muncul lagi otomatis saat
+ * pembelian berikutnya untuk nama material yang sama.
+ */
+export async function deleteStock(materialName: string): Promise<ActionResponse> {
+  const ctx = await requireAdmin();
+  if (!ctx) return { error: 'Anda tidak punya akses admin.' };
+
+  const name = materialName.trim();
+  if (!name) return { error: 'Nama material tidak valid.' };
+
+  const { error } = await ctx.supabase
+    .from('material_stocks')
+    .delete()
+    .eq('material_name', name);
+  if (error) return { error: error.message };
+
+  revalidatePath('/admin/stock');
+  revalidatePath('/admin/requests');
+  revalidatePath('/admin/purchases');
+  return { success: true };
+}

@@ -19,7 +19,10 @@ export function ReportsManager({ rows }: { rows: ReportRow[] }) {
     });
   }
 
-  const totalOut = rows.reduce((acc, r) => acc + (r.kind === 'group' ? r.total : r.amount), 0);
+  const totalOut = rows.reduce((acc, r) => {
+    if (r.kind === 'income') return acc;
+    return acc + (r.kind === 'group' ? r.total : r.amount);
+  }, 0);
   const totalIn = rows
     .filter((r) => r.kind === 'income')
     .reduce((acc, r) => acc + r.amount, 0);

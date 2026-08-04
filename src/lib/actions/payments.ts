@@ -96,6 +96,7 @@ export async function payPurchaseGroup(
   revalidatePath('/admin/payments');
   revalidatePath('/admin/reports');
   revalidatePath('/admin/dashboard');
+  revalidatePath('/admin/cashflow');
   return { success: true };
 }
 
@@ -134,6 +135,7 @@ export async function createManualPayment(input: {
 
   revalidatePath('/admin/payments');
   revalidatePath('/admin/reports');
+  revalidatePath('/admin/cashflow');
   return { success: true };
 }
 
@@ -183,6 +185,7 @@ export async function updatePayment(
   revalidatePath('/admin/payments');
   revalidatePath('/admin/reports');
   revalidatePath('/admin/dashboard');
+  revalidatePath('/admin/cashflow');
   return { success: true };
 }
 

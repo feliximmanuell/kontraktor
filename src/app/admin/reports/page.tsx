@@ -36,7 +36,11 @@ export default async function AdminReportsPage({
   if (material) paymentQuery = paymentQuery.ilike('material_name', `%${material}%`);
   if (from) paymentQuery = paymentQuery.gte('paid_at', `${from}T00:00:00`);
   if (to) paymentQuery = paymentQuery.lte('paid_at', `${to}T23:59:59`);
-  if (type === 'purchase' || type === 'manual') paymentQuery = paymentQuery.eq('payment_type', type);
+  if (type === 'pemasukan') {
+    paymentQuery = paymentQuery.eq('payment_type', '__none__'); // saring habis
+  } else if (type === 'purchase' || type === 'manual') {
+    paymentQuery = paymentQuery.eq('payment_type', type);
+  }
 
   let incomeQuery = supabase
     .from('cashflow')
