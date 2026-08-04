@@ -48,7 +48,7 @@ export function AdminNav({
         <div className="flex h-14 items-center gap-2 border-b px-4">
           <HardHat className="size-5" />
           <div className="leading-tight">
-            <p className="text-sm font-semibold">Material Audit</p>
+            <p className="text-sm font-semibold">Material Audit made for Zelysca</p>
             <p className="text-xs text-muted-foreground">Portal {role === 'bos' ? 'Bos' : 'Admin'}</p>
           </div>
         </div>
