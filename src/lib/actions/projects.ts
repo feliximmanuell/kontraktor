@@ -24,6 +24,16 @@ export async function selectProject(formData: FormData): Promise<void> {
   }
 
   const project = String(formData.get('project') ?? '').trim();
+
+  if (project) {
+    const { error } = await supabase
+      .from('projects')
+      .upsert({ name: project }, { onConflict: 'name' });
+    if (error) {
+      redirect('/admin/projects');
+    }
+  }
+
   const store = await cookies();
   // Kosong = "Semua Proyek". Simpan nilai sentinel, bukan hapus cookie, agar
   // middleware tahu bahwa pengguna SUDAH memilih (bukan belum memilih).
@@ -57,6 +67,8 @@ export async function deleteProject(projectName: string): Promise<void> {
   for (const table of tables) {
     await supabase.from(table).delete().eq('project_name', name);
   }
+
+  await supabase.from('projects').delete().eq('name', name);
 
   const store = await cookies();
   if (store.get(MANAGED_PROJECT_COOKIE)?.value === name) {

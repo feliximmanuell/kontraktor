@@ -9,20 +9,14 @@ export default async function AdminProjectsPage() {
   await requireRole(['admin', 'bos']);
   const supabase = await createClient();
 
-  const [{ data: r1 }, { data: r2 }, { data: r3 }, { data: r4 }] = await Promise.all([
-    supabase.from('material_requests').select('project_name'),
-    supabase.from('purchases').select('project_name'),
-    supabase.from('payments').select('project_name'),
-    supabase.from('material_usages').select('project_name'),
-  ]);
+  const { data: projects } = await supabase
+    .from('projects')
+    .select('name')
+    .order('name', { ascending: true });
 
-  const names = Array.from(
-    new Set(
-      [...(r1 ?? []), ...(r2 ?? []), ...(r3 ?? []), ...(r4 ?? [])]
-        .map((x) => (x as { project_name: string }).project_name)
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b));
+  const names = (projects ?? [])
+    .map((p) => (p as { name: string }).name)
+    .filter(Boolean);
 
   return (
     <div className="space-y-6">
