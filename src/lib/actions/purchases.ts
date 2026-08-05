@@ -180,11 +180,18 @@ export async function updatePurchase(
     .eq('id', purchaseId);
   if (error) return { error: error.message };
 
+  // Sinkronkan nama toko ke pembayaran terkait agar laporan/cashflow konsisten.
+  await ctx.supabase
+    .from('payments')
+    .update({ store_name: storeName })
+    .eq('purchase_id', purchaseId);
+
   revalidatePath('/admin/purchases');
   revalidatePath('/admin/dashboard');
   revalidatePath('/admin/audit');
   revalidatePath('/admin/stock');
   revalidatePath('/admin/reports');
+  revalidatePath('/admin/payments');
   return { success: true };
 }
 

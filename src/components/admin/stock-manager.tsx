@@ -31,12 +31,14 @@ export function StockManager({
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<MaterialStock | null>(null);
   const [newValue, setNewValue] = useState('');
+  const [newUnit, setNewUnit] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<MaterialStock | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   function openDialog(s: MaterialStock) {
     setEditing(s);
     setNewValue(String(s.current_stock));
+    setNewUnit(s.unit ?? '');
   }
 
   async function onSave() {
@@ -46,8 +48,12 @@ export function StockManager({
       toast.error('Jumlah stok tidak valid.');
       return;
     }
+    if (!newUnit.trim()) {
+      toast.error('Satuan wajib diisi.');
+      return;
+    }
     setBusy(true);
-    const res = await adjustStock(editing.material_name, value);
+    const res = await adjustStock(editing.material_name, value, newUnit.trim());
     setBusy(false);
     if (res.error) {
       toast.error(res.error);
@@ -140,16 +146,27 @@ export function StockManager({
               {editing ? editing.material_name : ''}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="newStock">Jumlah Stok</Label>
-            <Input
-              id="newStock"
-              type="number"
-              step="any"
-              min="0"
-              value={newValue}
-              onChange={(e) => setNewValue(e.target.value)}
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="newStock">Jumlah Stok</Label>
+              <Input
+                id="newStock"
+                type="number"
+                step="any"
+                min="0"
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newUnit">Satuan</Label>
+              <Input
+                id="newUnit"
+                value={newUnit}
+                placeholder="Cth: sak, batang, liter"
+                onChange={(e) => setNewUnit(e.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>

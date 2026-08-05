@@ -84,6 +84,7 @@ export function PaymentsManager({
     description: '',
     projectName: '',
     materialName: '',
+    storeName: '',
     amount: '',
     paidAt: todayInput(),
   });
@@ -142,6 +143,7 @@ export function PaymentsManager({
       description: p.description,
       projectName: managedProject ?? p.project_name,
       materialName: p.material_name ?? '',
+      storeName: p.store_name ?? '',
       amount: String(p.amount),
       paidAt: p.paid_at.slice(0, 10),
     });
@@ -161,6 +163,7 @@ export function PaymentsManager({
       description,
       project_name: projectName,
       material_name: editForm.materialName.trim() || undefined,
+      store_name: editForm.storeName.trim() || undefined,
       amount,
       paid_at: new Date(editForm.paidAt + 'T00:00:00').toISOString(),
     });
@@ -420,6 +423,7 @@ export function PaymentsManager({
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Tanggal</th>
                   <th className="px-4 py-3 font-medium">Proyek</th>
+                  <th className="px-4 py-3 font-medium">Toko</th>
                   <th className="px-4 py-3 font-medium">Keterangan</th>
                   <th className="px-4 py-3 text-right font-medium">Jumlah</th>
                   <th className="px-4 py-3 font-medium">Tipe</th>
@@ -435,6 +439,7 @@ export function PaymentsManager({
                       {formatDateTime(p.paid_at)}
                     </td>
                     <td className="px-4 py-3 font-medium">{p.project_name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{p.store_name ?? '-'}</td>
                     <td className="px-4 py-3">
                       <p>{p.description}</p>
                       {p.material_name ? (
@@ -576,6 +581,19 @@ export function PaymentsManager({
                   }
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="editStoreName">Nama Toko</Label>
+                <Input
+                  id="editStoreName"
+                  value={editForm.storeName}
+                  placeholder="Cth: TB Bangun Jaya"
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, storeName: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="editMaterialName">Material (opsional)</Label>
                 <Input

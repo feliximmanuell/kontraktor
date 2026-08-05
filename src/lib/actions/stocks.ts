@@ -27,24 +27,33 @@ async function requireAdmin() {
 
 /**
  * Sesuaikan stok material secara manual (perbaikan / stok awal).
- * Upsert berdasarkan nama material.
+ * Upsert berdasarkan nama material. Satuan ikut diperbarui bila diisi.
  */
 export async function adjustStock(
   materialName: string,
-  newStock: number
+  newStock: number,
+  unit?: string
 ): Promise<ActionResponse> {
   const ctx = await requireAdmin();
   if (!ctx) return { error: 'Anda tidak punya akses admin.' };
 
   const name = materialName.trim();
+  const trimmedUnit = unit?.trim() ?? '';
   if (!name || !(newStock >= 0)) {
     return { error: 'Nama material dan jumlah stok tidak valid.' };
   }
 
-  const { error } = await ctx.supabase.from('material_stocks').upsert(
-    { material_name: name, current_stock: newStock, updated_at: new Date().toISOString() },
-    { onConflict: 'material_name' }
-  );
+  const payload: {
+    material_name: string;
+    current_stock: number;
+    updated_at: string;
+    unit?: string;
+  } = { material_name: name, current_stock: newStock, updated_at: new Date().toISOString() };
+  if (trimmedUnit) payload.unit = trimmedUnit;
+
+  const { error } = await ctx.supabase.from('material_stocks').upsert(payload, {
+    onConflict: 'material_name',
+  });
   if (error) return { error: error.message };
 
   revalidatePath('/admin/stock');

@@ -141,13 +141,14 @@ export async function createManualPayment(input: {
   return { success: true };
 }
 
-/** Edit pembayaran (deskripsi, proyek, material, jumlah, tanggal). */
+/** Edit pembayaran (deskripsi, proyek, toko, material, jumlah, tanggal). */
 export async function updatePayment(
   paymentId: string,
   input: {
     description: string;
     project_name: string;
     material_name?: string;
+    store_name?: string;
     amount: number;
     paid_at: string;
   }
@@ -159,6 +160,7 @@ export async function updatePayment(
   const description = input.description.trim();
   const projectName = managed ?? input.project_name.trim();
   const materialName = input.material_name?.trim() ?? '';
+  const storeName = input.store_name?.trim() ?? '';
   const amount = Number(input.amount);
 
   if (!description || !projectName || !(amount >= 0) || !input.paid_at) {
@@ -167,7 +169,7 @@ export async function updatePayment(
 
   const { data: existing } = await ctx.supabase
     .from('payments')
-    .select('id')
+    .select('id, purchase_id')
     .eq('id', paymentId)
     .maybeSingle();
   if (!existing) return { error: 'Pembayaran tidak ditemukan.' };
@@ -178,16 +180,27 @@ export async function updatePayment(
       description,
       project_name: projectName,
       material_name: materialName || null,
+      store_name: storeName || null,
       amount,
       paid_at: input.paid_at,
     })
     .eq('id', paymentId);
   if (error) return { error: error.message };
 
+  // Sinkronkan nama toko ke pembelian terkait agar pencatatan tetap konsisten.
+  if (storeName && existing.purchase_id) {
+    await ctx.supabase
+      .from('purchases')
+      .update({ store_name: storeName })
+      .eq('id', existing.purchase_id);
+  }
+
   revalidatePath('/admin/payments');
   revalidatePath('/admin/reports');
   revalidatePath('/admin/dashboard');
   revalidatePath('/admin/cashflow');
+  revalidatePath('/admin/purchases');
+  revalidatePath('/admin/audit');
   return { success: true };
 }
 
