@@ -11,6 +11,7 @@ type RequestRow = {
   project_name: string;
   material_name: string;
   requested_qty: string;
+  unit: string;
   notes: string | null;
   status: string;
   created_at: string;
@@ -23,6 +24,7 @@ type PurchaseRow = {
   material_name: string;
   store_name: string;
   qty: string;
+  unit: string;
   total_price: number;
   receipt_status: string;
   purchased_at: string;
@@ -58,13 +60,13 @@ export default async function AdminAuditPage({
     supabase
       .from('material_requests')
       .select(
-        'id, project_name, material_name, requested_qty, notes, status, created_at, requester_id, requester_name'
+        'id, project_name, material_name, requested_qty, unit, notes, status, created_at, requester_id, requester_name'
       )
       .order('created_at', { ascending: false }),
     supabase
       .from('purchases')
       .select(
-        'id, project_name, material_name, store_name, qty, total_price, receipt_status, purchased_at, purchased_by'
+        'id, project_name, material_name, store_name, qty, unit, total_price, receipt_status, purchased_at, purchased_by'
       )
       .order('purchased_at', { ascending: false }),
     supabase
@@ -97,6 +99,7 @@ export default async function AdminAuditPage({
       project_name: string;
       material_name: string;
       requested_qty: string;
+      unit: string;
       notes: string | null;
       status: string;
       created_at: string;
@@ -119,6 +122,7 @@ export default async function AdminAuditPage({
       material_name: string;
       store_name: string;
       qty: string;
+      unit: string;
       total_price: number;
       receipt_status: string;
       purchased_at: string;
@@ -209,7 +213,7 @@ export default async function AdminAuditPage({
                         <div key={row.id} className="rounded-lg border p-3 text-sm">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-medium">
-                              {row.material_name} ({row.requested_qty})
+                              {row.material_name} ({row.requested_qty} {row.unit})
                             </span>
                             <RequestStatusBadge
                               status={row.status as 'pending' | 'approved' | 'rejected'}
@@ -237,7 +241,7 @@ export default async function AdminAuditPage({
                         <div key={row.id} className="rounded-lg border p-3 text-sm">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-medium">
-                              {row.material_name} ({row.qty})
+                              {row.material_name} ({row.qty} {row.unit})
                             </span>
                             <span className="font-semibold">{formatIDR(row.total_price)}</span>
                           </div>

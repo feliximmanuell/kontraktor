@@ -9,6 +9,7 @@ export interface JournalRow {
   date: string;
   description: string;
   project_name: string;
+  store_name: string | null;
   kind: 'pemasukan' | 'pengeluaran';
   source: 'cashflow' | 'payment';
   amount: number;
@@ -40,7 +41,7 @@ export default async function AdminCashflowPage({
     .select('id, description, project_name, amount, entry_date, created_by');
   let expenseQ = supabase
     .from('payments')
-    .select('id, description, project_name, amount, paid_at, paid_by');
+    .select('id, description, project_name, store_name, amount, paid_at, paid_by');
 
   if (project) {
     incomeQ = incomeQ.ilike('project_name', `%${project}%`);
@@ -90,6 +91,7 @@ export default async function AdminCashflowPage({
         date: row.entry_date,
         description: row.description,
         project_name: row.project_name,
+        store_name: null,
         kind: 'pemasukan' as const,
         source: 'cashflow' as const,
         amount: Number(row.amount ?? 0),
@@ -101,6 +103,7 @@ export default async function AdminCashflowPage({
         id: string;
         description: string;
         project_name: string;
+        store_name: string | null;
         amount: number;
         paid_at: string;
         paid_by: string | null;
@@ -110,6 +113,7 @@ export default async function AdminCashflowPage({
         date: row.paid_at,
         description: row.description,
         project_name: row.project_name,
+        store_name: row.store_name,
         kind: 'pengeluaran' as const,
         source: 'payment' as const,
         amount: Number(row.amount ?? 0),

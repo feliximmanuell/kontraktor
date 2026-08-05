@@ -29,7 +29,7 @@ export default async function AdminReportsPage({
   let paymentQuery = supabase
     .from('payments')
     .select(
-      'id, payment_type, purchase_id, description, project_name, material_name, amount, paid_at'
+      'id, payment_type, purchase_id, description, project_name, material_name, store_name, amount, paid_at'
     );
 
   if (project) paymentQuery = paymentQuery.ilike('project_name', `%${project}%`);
@@ -66,6 +66,7 @@ export default async function AdminReportsPage({
     description: string;
     project_name: string;
     material_name: string | null;
+    store_name: string | null;
     amount: number;
     paid_at: string;
   }[];
@@ -80,12 +81,12 @@ export default async function AdminReportsPage({
   );
   const purchaseMap = new Map<
     string,
-    { purchase_group: string; material_name: string; qty: string }
+    { purchase_group: string; material_name: string; qty: string; unit: string }
   >();
   if (purchaseIds.length > 0) {
     const { data: purchases } = await supabase
       .from('purchases')
-      .select('id, purchase_group, material_name, qty')
+      .select('id, purchase_group, material_name, qty, unit')
       .in('id', purchaseIds);
     for (const p of purchases ?? []) {
       const row = p as unknown as {
@@ -93,11 +94,13 @@ export default async function AdminReportsPage({
         purchase_group: string;
         material_name: string;
         qty: string;
+        unit: string;
       };
       purchaseMap.set(row.id, {
         purchase_group: row.purchase_group,
         material_name: row.material_name,
         qty: row.qty,
+        unit: row.unit,
       });
     }
   }
@@ -117,15 +120,19 @@ export default async function AdminReportsPage({
           id: gid,
           paid_at: p.paid_at,
           project_name: p.project_name,
+          store_name: p.store_name,
           description: '',
           items: [],
           total: 0,
         };
         groupMap.set(gid, group);
+      } else if (!group.store_name && p.store_name) {
+        group.store_name = p.store_name;
       }
       group.items.push({
         material_name: purchase?.material_name ?? p.material_name ?? '',
         qty: purchase?.qty ?? '',
+        unit: purchase?.unit ?? '',
         amount: Number(p.amount ?? 0),
       });
       group.total += Number(p.amount ?? 0);

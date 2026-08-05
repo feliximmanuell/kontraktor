@@ -16,7 +16,7 @@ export default async function AdminDashboardPage() {
   let pendingReqQ = supabase.from('material_requests').select('id').eq('status', 'pending');
   let recentReqQ = supabase
     .from('material_requests')
-    .select('id, project_name, material_name, requested_qty, notes, status, created_at')
+    .select('id, project_name, material_name, requested_qty, unit, notes, status, created_at')
     .order('created_at', { ascending: false })
     .limit(6);
   if (managed) {
@@ -125,6 +125,7 @@ export default async function AdminDashboardPage() {
                   project_name: string;
                   material_name: string;
                   requested_qty: string;
+                  unit: string;
                   notes: string | null;
                   status: string;
                   created_at: string;
@@ -134,7 +135,7 @@ export default async function AdminDashboardPage() {
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium">
                         {row.material_name}{' '}
-                        <span className="text-muted-foreground">({row.requested_qty})</span>
+                        <span className="text-muted-foreground">({row.requested_qty} {row.unit})</span>
                       </p>
                       <RequestStatusBadge
                         status={row.status as 'pending' | 'approved' | 'rejected'}

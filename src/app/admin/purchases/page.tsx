@@ -13,12 +13,12 @@ export default async function AdminPurchasesPage() {
   let purchasesQ = supabase
     .from('purchases')
     .select(
-      'id, request_id, project_name, material_name, store_name, qty, total_price, paid, receipt_status, receipt_image_url, purchased_by, purchased_at'
+      'id, request_id, project_name, material_name, store_name, qty, unit, unit_price, discount_percent, total_price, paid, receipt_status, receipt_image_url, purchased_by, purchased_at'
     )
     .order('purchased_at', { ascending: false });
   let approvedQ = supabase
     .from('material_requests')
-    .select('id, project_name, material_name, requested_qty, status')
+    .select('id, project_name, material_name, requested_qty, unit, status')
     .eq('status', 'approved');
   if (managed) {
     purchasesQ = purchasesQ.eq('project_name', managed);
@@ -44,12 +44,14 @@ export default async function AdminPurchasesPage() {
         project_name: string;
         material_name: string;
         requested_qty: string;
+        unit: string;
       };
       return {
         id: row.id,
         project_name: row.project_name,
         material_name: row.material_name,
         requested_qty: row.requested_qty,
+        unit: row.unit,
       };
     });
 
@@ -79,6 +81,9 @@ export default async function AdminPurchasesPage() {
         material_name: string;
         store_name: string;
         qty: string;
+        unit: string;
+        unit_price: number;
+        discount_percent: number;
         total_price: number;
         paid: boolean;
         receipt_status: PurchaseJoined['receipt_status'];

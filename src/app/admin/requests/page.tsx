@@ -12,7 +12,7 @@ export default async function AdminRequestsPage() {
   let query = supabase
     .from('material_requests')
     .select(
-      'id, project_name, requester_id, requester_name, material_name, requested_qty, notes, status, is_flagged_duplicate, created_at'
+      'id, project_name, requester_id, requester_name, material_name, requested_qty, unit, notes, status, is_flagged_duplicate, created_at'
     )
     .order('created_at', { ascending: false });
   if (managed) query = query.eq('project_name', managed);
@@ -43,6 +43,7 @@ export default async function AdminRequestsPage() {
       requester_name: string | null;
       material_name: string;
       requested_qty: string;
+      unit: string;
       notes: string | null;
       status: RequestJoined['status'];
       is_flagged_duplicate: boolean;
@@ -54,6 +55,7 @@ export default async function AdminRequestsPage() {
       requester_id: row.requester_id,
       material_name: row.material_name,
       requested_qty: row.requested_qty,
+      unit: row.unit,
       notes: row.notes,
       status: row.status,
       is_flagged_duplicate: row.is_flagged_duplicate,

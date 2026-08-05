@@ -35,6 +35,7 @@ export interface MaterialRequest {
   material_id: string | null;
   material_name: string;
   requested_qty: string;
+  unit: string;
   notes: string | null;
   status: RequestStatus;
   is_flagged_duplicate: boolean;
@@ -50,6 +51,9 @@ export interface Purchase {
   material_name: string;
   store_name: string;
   qty: string;
+  unit: string;
+  unit_price: number;
+  discount_percent: number;
   total_price: number;
   receipt_status: ReceiptStatus;
   receipt_image_url: string | null;
@@ -86,6 +90,7 @@ export interface Payment {
   description: string;
   project_name: string;
   material_name: string | null;
+  store_name: string | null;
   amount: number;
   paid_at: string;
   paid_by: string | null;
@@ -103,6 +108,7 @@ export interface UnpaidPurchase {
   material_name: string;
   store_name: string;
   qty: string;
+  unit: string;
   total_price: number;
   purchased_at: string;
 }
@@ -110,6 +116,7 @@ export interface UnpaidPurchase {
 export interface ReportGroupItem {
   material_name: string;
   qty: string;
+  unit: string;
   amount: number;
 }
 
@@ -118,6 +125,7 @@ export interface ReportGroupRow {
   id: string;
   paid_at: string;
   project_name: string;
+  store_name: string | null;
   description: string;
   items: ReportGroupItem[];
   total: number;
@@ -152,6 +160,7 @@ export interface RequestJoined {
   requester_id: string | null;
   material_name: string;
   requested_qty: string;
+  unit: string;
   notes: string | null;
   status: RequestStatus;
   is_flagged_duplicate: boolean;
@@ -166,6 +175,9 @@ export interface PurchaseJoined {
   material_name: string;
   store_name: string;
   qty: string;
+  unit: string;
+  unit_price: number;
+  discount_percent: number;
   total_price: number;
   paid: boolean;
   receipt_status: ReceiptStatus;

@@ -26,6 +26,7 @@ const schema = z.object({
   requesterName: z.string().min(1, 'Nama Anda wajib diisi'),
   materialName: z.string().min(1, 'Nama material wajib diisi'),
   requestedQty: z.string().min(1, 'Jumlah wajib diisi'),
+  unit: z.string().min(1, 'Satuan wajib diisi'),
   notes: z.string().max(500, 'Catatan maksimal 500 karakter').optional(),
 });
 
@@ -48,6 +49,7 @@ export default function RequestPage() {
       requesterName: '',
       materialName: '',
       requestedQty: '',
+      unit: '',
       notes: '',
     },
   });
@@ -61,6 +63,7 @@ export default function RequestPage() {
     formData.set('requesterName', values.requesterName);
     formData.set('materialName', values.materialName);
     formData.set('requestedQty', values.requestedQty);
+    formData.set('unit', values.unit);
     formData.set('notes', values.notes ?? '');
 
     const res = await createMaterialRequest(formData);
@@ -143,17 +146,36 @@ export default function RequestPage() {
               ) : null}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="requestedQty">Jumlah Dibutuhkan</Label>
-              <Input
-                id="requestedQty"
-                placeholder="Cth: 10 sak, 2 truk, 50 batang"
-                className="h-12 text-base"
-                {...register('requestedQty')}
-              />
-              {errors.requestedQty ? (
-                <p className="text-xs text-destructive">{errors.requestedQty.message}</p>
-              ) : null}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="requestedQty">Jumlah</Label>
+                <Input
+                  id="requestedQty"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="Cth: 10, 2, 0.5"
+                  className="h-12 text-base"
+                  {...register('requestedQty')}
+                />
+                {errors.requestedQty ? (
+                  <p className="text-xs text-destructive">
+                    {errors.requestedQty.message}
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="unit">Satuan</Label>
+                <Input
+                  id="unit"
+                  placeholder="Cth: sak, truk, batang"
+                  className="h-12 text-base"
+                  {...register('unit')}
+                />
+                {errors.unit ? (
+                  <p className="text-xs text-destructive">{errors.unit.message}</p>
+                ) : null}
+              </div>
             </div>
 
             <div className="space-y-2">

@@ -44,7 +44,7 @@ export async function payPurchaseGroup(
 
   const { data: rows } = await ctx.supabase
     .from('purchases')
-    .select('id, project_name, material_name, total_price, paid')
+    .select('id, project_name, material_name, store_name, total_price, paid')
     .in('id', ids);
 
   if (!rows) return { error: 'Pembelian tidak ditemukan.' };
@@ -70,6 +70,7 @@ export async function payPurchaseGroup(
     description: string;
     project_name: string;
     material_name: string;
+    store_name: string | null;
     amount: number;
     paid_at: string;
     paid_by: string;
@@ -79,6 +80,7 @@ export async function payPurchaseGroup(
     description: `Pembayaran pembelian ${p.material_name}`,
     project_name: p.project_name,
     material_name: p.material_name,
+    store_name: (p as unknown as { store_name: string | null }).store_name ?? null,
     amount: shares[i],
     paid_at: input.paid_at,
     paid_by: ctx.user.id,

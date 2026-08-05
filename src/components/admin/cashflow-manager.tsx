@@ -281,6 +281,7 @@ export function CashflowManager({
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Tanggal</th>
                   <th className="px-4 py-3 font-medium">Proyek</th>
+                  <th className="px-4 py-3 font-medium">Toko</th>
                   <th className="px-4 py-3 font-medium">Keterangan</th>
                   <th className="px-4 py-3 font-medium">Pencatat</th>
                   <th className="px-4 py-3 text-right font-medium">Pemasukan</th>
@@ -297,6 +298,9 @@ export function CashflowManager({
                       {formatDateTime(r.date)}
                     </td>
                     <td className="px-4 py-3 font-medium">{r.project_name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {r.kind === 'pengeluaran' ? (r.store_name ?? '-') : '-'}
+                    </td>
                     <td className="px-4 py-3">{r.description}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{r.by_name}</td>
                     <td className="px-4 py-3 text-right font-semibold">

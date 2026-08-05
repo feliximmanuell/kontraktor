@@ -307,7 +307,9 @@ export function PaymentsManager({
                                   <td className="py-1.5 pr-2 font-medium">
                                     {it.material_name}
                                   </td>
-                                  <td className="py-1.5 pr-2 text-right">{it.qty}</td>
+                                  <td className="py-1.5 pr-2 text-right">
+                                    {it.qty} {it.unit}
+                                  </td>
                                   <td className="py-1.5 text-right font-medium">
                                     {formatIDR(it.total_price)}
                                   </td>
@@ -498,7 +500,7 @@ export function PaymentsManager({
                 {payTarget.items.map((it) => (
                   <p key={it.id} className="flex justify-between gap-2 py-0.5">
                     <span>
-                      {it.material_name} ({it.qty})
+                      {it.material_name} ({it.qty} {it.unit})
                     </span>
                     <span className="font-medium">{formatIDR(it.total_price)}</span>
                   </p>

@@ -71,6 +71,7 @@ export function ReportsManager({ rows }: { rows: ReportRow[] }) {
                 <th className="w-10 px-2 py-3" />
                 <th className="px-2 py-3 font-medium">Tanggal</th>
                 <th className="px-4 py-3 font-medium">Proyek</th>
+                <th className="px-4 py-3 font-medium">Toko</th>
                 <th className="px-4 py-3 font-medium">Material</th>
                 <th className="px-4 py-3 font-medium">Keterangan</th>
                 <th className="px-4 py-3 font-medium">Tipe</th>
@@ -128,6 +129,9 @@ function RowGroup({
           {formatDateTime(isIncome ? row.entry_date : row.paid_at)}
         </td>
         <td className="px-4 py-3 font-medium">{row.project_name}</td>
+        <td className="px-4 py-3 text-muted-foreground">
+          {isGroup ? (row.store_name ?? '-') : '-'}
+        </td>
         <td className="px-4 py-3">
           {isGroup ? `${row.items.length} item` : isIncome ? '-' : (row.material_name ?? '-')}
         </td>
@@ -154,12 +158,13 @@ function RowGroup({
       </tr>
       {isGroup && isOpen ? (
         <tr className="border-b bg-muted/30 last:border-0">
-          <td colSpan={7} className="px-10 py-3">
+          <td colSpan={8} className="px-10 py-3">
             <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
                   <th className="py-1 pr-2 font-medium">Material</th>
                   <th className="py-1 pr-2 text-right font-medium">Qty</th>
+                  <th className="py-1 pr-2 font-medium">Satuan</th>
                   <th className="py-1 text-right font-medium">Jumlah Dibayar</th>
                 </tr>
               </thead>
@@ -168,6 +173,7 @@ function RowGroup({
                   <tr key={`${row.id}-${i}`} className="border-b last:border-0">
                     <td className="py-1.5 pr-2 font-medium">{it.material_name}</td>
                     <td className="py-1.5 pr-2 text-right">{it.qty || '-'}</td>
+                    <td className="py-1.5 pr-2">{it.unit || '-'}</td>
                     <td className="py-1.5 text-right font-medium">{formatIDR(it.amount)}</td>
                   </tr>
                 ))}

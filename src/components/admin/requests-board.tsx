@@ -72,7 +72,7 @@ export function RequestsBoard({
                     <p className="font-semibold">
                       {req.material_name}{' '}
                       <span className="font-normal text-muted-foreground">
-                        ({req.requested_qty})
+                        ({req.requested_qty} {req.unit})
                       </span>
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">

@@ -12,13 +12,13 @@ export default async function AdminPaymentsPage() {
   let unpaidQ = supabase
     .from('purchases')
     .select(
-      'id, purchase_group, project_name, material_name, store_name, qty, total_price, purchased_at'
+      'id, purchase_group, project_name, material_name, store_name, qty, unit, total_price, purchased_at'
     )
     .eq('paid', false)
     .order('purchased_at', { ascending: false });
   let paymentsQ = supabase
     .from('payments')
-    .select('id, payment_type, purchase_id, description, project_name, material_name, amount, paid_at, paid_by')
+    .select('id, payment_type, purchase_id, description, project_name, material_name, store_name, amount, paid_at, paid_by')
     .order('paid_at', { ascending: false })
     .limit(50);
   if (managed) {
@@ -50,6 +50,7 @@ export default async function AdminPaymentsPage() {
       description: string;
       project_name: string;
       material_name: string | null;
+      store_name: string | null;
       amount: number;
       paid_at: string;
       paid_by: string | null;

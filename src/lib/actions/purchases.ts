@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getManagedProject } from '@/lib/projects';
+import { computePurchaseTotal } from '@/lib/utils';
 
 export type ActionResponse = {
   success?: boolean;
@@ -28,8 +29,9 @@ async function requireAdmin() {
 
 /**
  * Catat pembelian material — bisa beberapa barang sekaligus dalam satu transaksi.
- * Semua field bebas teks (nama proyek, nama material, qty). Total harga per barang
- * diisi manual. Jika file bon diunggah, status bon = 'received'.
+ * Semua field bebas teks (nama proyek, nama material, satuan). Qty berupa angka,
+ * harga satuan & diskon (persen) diinput, lalu total dihitung otomatis
+ * (qty x harga) - diskon. Jika file bon diunggah, status bon = 'received'.
  */
 export async function createPurchase(formData: FormData): Promise<ActionResponse> {
   const ctx = await requireAdmin();
@@ -44,17 +46,23 @@ export async function createPurchase(formData: FormData): Promise<ActionResponse
 
   const materialNames = formData.getAll('materialName').map((v) => String(v).trim());
   const qtys = formData.getAll('qty').map((v) => String(v).trim());
-  const totalPrices = formData.getAll('totalPrice').map((v) => Number(v));
+  const units = formData.getAll('unit').map((v) => String(v).trim());
+  const unitPrices = formData.getAll('unitPrice').map((v) => Number(v));
+  const discounts = formData.getAll('discountPercent').map((v) => Number(v));
 
   if (
     !projectName ||
     !storeName ||
     materialNames.length === 0 ||
     qtys.length !== materialNames.length ||
-    totalPrices.length !== materialNames.length ||
+    units.length !== materialNames.length ||
+    unitPrices.length !== materialNames.length ||
+    discounts.length !== materialNames.length ||
     materialNames.some((m) => !m) ||
     qtys.some((q) => !q) ||
-    totalPrices.some((t) => !(t >= 0))
+    units.some((u) => !u) ||
+    unitPrices.some((p) => !(p >= 0)) ||
+    discounts.some((d) => !(d >= 0) || d > 100)
   ) {
     return { error: 'Data pembelian tidak lengkap. Periksa kembali input Anda.' };
   }
@@ -72,20 +80,26 @@ export async function createPurchase(formData: FormData): Promise<ActionResponse
     receiptStatus = 'received';
   }
 
-  const rows = materialNames.map((materialName, i) => ({
-    purchase_group: groupId,
-    request_id: i === 0 ? requestId : null,
-    project_id: null,
-    project_name: projectName,
-    material_id: null,
-    material_name: materialName,
-    store_name: storeName,
-    qty: qtys[i],
-    total_price: totalPrices[i],
-    receipt_status: receiptStatus,
-    receipt_image_url: receiptPath,
-    purchased_by: ctx.user.id,
-  }));
+  const rows = materialNames.map((materialName, i) => {
+    const total = computePurchaseTotal(Number(qtys[i]), unitPrices[i], discounts[i]);
+    return {
+      purchase_group: groupId,
+      request_id: i === 0 ? requestId : null,
+      project_id: null,
+      project_name: projectName,
+      material_id: null,
+      material_name: materialName,
+      store_name: storeName,
+      qty: qtys[i],
+      unit: units[i],
+      unit_price: unitPrices[i],
+      discount_percent: discounts[i],
+      total_price: total,
+      receipt_status: receiptStatus,
+      receipt_image_url: receiptPath,
+      purchased_by: ctx.user.id,
+    };
+  });
 
   const { error } = await ctx.supabase.from('purchases').insert(rows);
 
@@ -99,7 +113,7 @@ export async function createPurchase(formData: FormData): Promise<ActionResponse
 }
 
 /**
- * Edit pembelian (proyek, toko, material, qty, total, tanggal).
+ * Edit pembelian (proyek, toko, material, qty, satuan, harga, diskon, total, tanggal).
  * Stok otomatis disesuaikan via trigger saat material/qty berubah.
  */
 export async function updatePurchase(
@@ -109,7 +123,9 @@ export async function updatePurchase(
     store_name: string;
     material_name: string;
     qty: string;
-    total_price: number;
+    unit: string;
+    unit_price: number;
+    discount_percent: number;
     purchased_at: string;
   }
 ): Promise<ActionResponse> {
@@ -121,9 +137,21 @@ export async function updatePurchase(
   const storeName = input.store_name.trim();
   const materialName = input.material_name.trim();
   const qty = input.qty.trim();
-  const totalPrice = Number(input.total_price);
+  const unit = input.unit.trim();
+  const unitPrice = Number(input.unit_price);
+  const discount = Number(input.discount_percent);
 
-  if (!projectName || !storeName || !materialName || !qty || !(totalPrice >= 0) || !input.purchased_at) {
+  if (
+    !projectName ||
+    !storeName ||
+    !materialName ||
+    !qty ||
+    !unit ||
+    !(unitPrice >= 0) ||
+    !(discount >= 0) ||
+    discount > 100 ||
+    !input.purchased_at
+  ) {
     return { error: 'Data pembelian tidak lengkap. Periksa kembali input Anda.' };
   }
 
@@ -134,6 +162,8 @@ export async function updatePurchase(
     .maybeSingle();
   if (!existing) return { error: 'Pembelian tidak ditemukan.' };
 
+  const total = computePurchaseTotal(Number(qty), unitPrice, discount);
+
   const { error } = await ctx.supabase
     .from('purchases')
     .update({
@@ -141,7 +171,10 @@ export async function updatePurchase(
       store_name: storeName,
       material_name: materialName,
       qty,
-      total_price: totalPrice,
+      unit,
+      unit_price: unitPrice,
+      discount_percent: discount,
+      total_price: total,
       purchased_at: input.purchased_at,
     })
     .eq('id', purchaseId);

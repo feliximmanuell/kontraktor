@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, Plus, Save, Trash2, UploadCloud, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { computePurchaseTotal } from '@/lib/utils';
 import type { PurchaseJoined } from '@/lib/types';
 import { formatIDR, formatDateTime } from '@/lib/format';
 interface ApprovedRequestOption {
@@ -45,6 +46,7 @@ interface ApprovedRequestOption {
   project_name: string;
   material_name: string;
   requested_qty: string;
+  unit: string;
 }
 
 const schema = z.object({
@@ -57,7 +59,9 @@ const schema = z.object({
       z.object({
         materialName: z.string().min(1, 'Nama material wajib diisi'),
         qty: z.string().min(1, 'Jumlah wajib diisi'),
-        totalPrice: z.number().min(0, 'Total harga tidak boleh negatif'),
+        unit: z.string().min(1, 'Satuan wajib diisi'),
+        unitPrice: z.number().min(0, 'Harga satuan tidak boleh negatif'),
+        discountPercent: z.string().optional(),
       })
     )
     .min(1, 'Minimal satu barang'),
@@ -87,7 +91,9 @@ export function PurchaseManager({
     storeName: '',
     materialName: '',
     qty: '',
-    totalPrice: '',
+    unit: '',
+    unitPrice: '',
+    discountPercent: '',
     purchasedAt: '',
   });
   const [editBusy, setEditBusy] = useState(false);
@@ -106,7 +112,15 @@ export function PurchaseManager({
       requestId: '',
       projectName: '',
       storeName: '',
-      items: [{ materialName: '', qty: '', totalPrice: undefined as unknown as number }],
+      items: [
+        {
+          materialName: '',
+          qty: '',
+          unit: '',
+          unitPrice: undefined as unknown as number,
+          discountPercent: '',
+        },
+      ],
     },
   });
 
@@ -119,14 +133,28 @@ export function PurchaseManager({
 
   const mode = useWatch({ control, name: 'mode' });
   const requestId = useWatch({ control, name: 'requestId' });
+  const itemsWatch = useWatch({ control, name: 'items' });
 
   const selectedRequest = requests.find((r) => r.id === requestId);
+
+  function itemTotal(i: number): { subtotal: number; discount: number; total: number } {
+    const it = itemsWatch?.[i];
+    if (!it) return { subtotal: 0, discount: 0, total: 0 };
+    const subtotal = (Number(it.qty) || 0) * (Number(it.unitPrice) || 0);
+    const total = computePurchaseTotal(
+      Number(it.qty) || 0,
+      Number(it.unitPrice) || 0,
+      Number(it.discountPercent) || 0
+    );
+    return { subtotal, discount: subtotal - total, total };
+  }
 
   function fillFromRequest() {
     if (mode === 'request' && selectedRequest) {
       setValue('projectName', selectedRequest.project_name);
       setValue('items.0.materialName', selectedRequest.material_name);
       setValue('items.0.qty', selectedRequest.requested_qty);
+      setValue('items.0.unit', selectedRequest.unit);
     }
   }
 
@@ -139,7 +167,9 @@ export function PurchaseManager({
     values.items.forEach((it) => {
       formData.append('materialName', it.materialName);
       formData.append('qty', it.qty);
-      formData.append('totalPrice', String(it.totalPrice));
+      formData.append('unit', it.unit);
+      formData.append('unitPrice', String(it.unitPrice));
+      formData.append('discountPercent', String(it.discountPercent ?? 0));
     });
     if (receiptFile) formData.set('receipt', receiptFile);
 
@@ -155,7 +185,15 @@ export function PurchaseManager({
       requestId: '',
       projectName: '',
       storeName: '',
-      items: [{ materialName: '', qty: '', totalPrice: undefined as unknown as number }],
+      items: [
+        {
+          materialName: '',
+          qty: '',
+          unit: '',
+          unitPrice: undefined as unknown as number,
+          discountPercent: '',
+        },
+      ],
     });
     setReceiptFile(null);
     router.refresh();
@@ -182,7 +220,9 @@ export function PurchaseManager({
       storeName: p.store_name,
       materialName: p.material_name,
       qty: p.qty,
-      totalPrice: String(p.total_price),
+      unit: p.unit,
+      unitPrice: String(p.unit_price),
+      discountPercent: String(p.discount_percent),
       purchasedAt: p.purchased_at.slice(0, 10),
     });
   }
@@ -193,8 +233,20 @@ export function PurchaseManager({
     const storeName = editForm.storeName.trim();
     const materialName = editForm.materialName.trim();
     const qty = editForm.qty.trim();
-    const totalPrice = Number(editForm.totalPrice);
-    if (!projectName || !storeName || !materialName || !qty || !(totalPrice >= 0) || !editForm.purchasedAt) {
+    const unit = editForm.unit.trim();
+    const unitPrice = Number(editForm.unitPrice);
+    const discountPercent = Number(editForm.discountPercent || 0);
+    if (
+      !projectName ||
+      !storeName ||
+      !materialName ||
+      !qty ||
+      !unit ||
+      !(unitPrice >= 0) ||
+      !(discountPercent >= 0) ||
+      discountPercent > 100 ||
+      !editForm.purchasedAt
+    ) {
       toast.error('Data pembelian tidak lengkap.');
       return;
     }
@@ -204,7 +256,9 @@ export function PurchaseManager({
       store_name: storeName,
       material_name: materialName,
       qty,
-      total_price: totalPrice,
+      unit,
+      unit_price: unitPrice,
+      discount_percent: discountPercent,
       purchased_at: new Date(editForm.purchasedAt + 'T00:00:00').toISOString(),
     });
     setEditBusy(false);
@@ -337,7 +391,7 @@ export function PurchaseManager({
                             ) : (
                               requests.map((r) => (
                                 <SelectItem key={r.id} value={r.id}>
-                                  {r.material_name} ({r.requested_qty}) - {r.project_name}
+                                  {r.material_name} ({r.requested_qty} {r.unit}) - {r.project_name}
                                 </SelectItem>
                               ))
                             )}
@@ -398,7 +452,13 @@ export function PurchaseManager({
                     variant="outline"
                     size="sm"
                     onClick={() =>
-                      append({ materialName: '', qty: '', totalPrice: undefined as unknown as number })
+                      append({
+                        materialName: '',
+                        qty: '',
+                        unit: '',
+                        unitPrice: undefined as unknown as number,
+                        discountPercent: '',
+                      })
                     }
                   >
                     <Plus />
@@ -426,8 +486,8 @@ export function PurchaseManager({
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="space-y-1 sm:col-span-1">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                      <div className="space-y-1 sm:col-span-2">
                         <Controller
                           control={control}
                           name={`items.${index}.materialName`}
@@ -447,7 +507,10 @@ export function PurchaseManager({
                       </div>
                       <div className="space-y-1">
                         <Input
-                          placeholder="Qty (mis. 5 sak)"
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Qty"
                           {...register(`items.${index}.qty` as const)}
                         />
                         {errors.items?.[index]?.qty ? (
@@ -458,18 +521,58 @@ export function PurchaseManager({
                       </div>
                       <div className="space-y-1">
                         <Input
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="Total harga (Rp)"
-                          {...register(`items.${index}.totalPrice` as const, { valueAsNumber: true })}
+                          placeholder="Satuan (mis. sak)"
+                          {...register(`items.${index}.unit` as const)}
                         />
-                        {errors.items?.[index]?.totalPrice ? (
+                        {errors.items?.[index]?.unit ? (
                           <p className="text-xs text-destructive">
-                            {errors.items[index].totalPrice.message}
+                            {errors.items[index].unit.message}
                           </p>
                         ) : null}
                       </div>
+                      <div className="space-y-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Harga satuan (Rp)"
+                          {...register(`items.${index}.unitPrice` as const, { valueAsNumber: true })}
+                        />
+                        {errors.items?.[index]?.unitPrice ? (
+                          <p className="text-xs text-destructive">
+                            {errors.items[index].unitPrice.message}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="space-y-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="any"
+                          placeholder="Diskon % (opsional)"
+                          {...register(`items.${index}.discountPercent` as const)}
+                        />
+                        {errors.items?.[index]?.discountPercent ? (
+                          <p className="text-xs text-destructive">
+                            {errors.items[index].discountPercent.message}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between rounded-md bg-muted/40 px-3 py-1.5 text-xs">
+                      <span className="text-muted-foreground">
+                        Subtotal: {formatIDR(itemTotal(index).subtotal)}
+                        {itemTotal(index).discount > 0 ? (
+                          <span className="text-destructive">
+                            {' '}
+                            − Diskon {formatIDR(itemTotal(index).discount)}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="font-semibold">
+                        Total: {formatIDR(itemTotal(index).total)}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -584,10 +687,12 @@ export function PurchaseManager({
                     </td>
                     <td className="px-4 py-3 font-medium">{p.project_name}</td>
                     <td className="px-4 py-3">
-                      {p.material_name} ({p.qty})
+                      {p.material_name} ({p.qty} {p.unit})
                     </td>
                     <td className="px-4 py-3">{p.store_name}</td>
-                    <td className="px-4 py-3 text-right">{p.qty}</td>
+                    <td className="px-4 py-3 text-right">
+                      {p.qty} {p.unit}
+                    </td>
                     <td className="px-4 py-3 text-right font-semibold">
                       {formatIDR(p.total_price)}
                     </td>
@@ -715,30 +820,69 @@ export function PurchaseManager({
                 <Label htmlFor="editQty">Qty</Label>
                 <Input
                   id="editQty"
+                  type="number"
+                  min="0"
+                  step="any"
                   value={editForm.qty}
                   onChange={(e) => setEditForm((f) => ({ ...f, qty: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="editTotalPrice">Total Harga (Rp)</Label>
+                <Label htmlFor="editUnit">Satuan</Label>
                 <Input
-                  id="editTotalPrice"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={editForm.totalPrice}
-                  onChange={(e) => setEditForm((f) => ({ ...f, totalPrice: e.target.value }))}
+                  id="editUnit"
+                  value={editForm.unit}
+                  onChange={(e) => setEditForm((f) => ({ ...f, unit: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="editPurchasedAt">Tanggal</Label>
+                <Label htmlFor="editUnitPrice">Harga Satuan (Rp)</Label>
                 <Input
-                  id="editPurchasedAt"
-                  type="date"
-                  value={editForm.purchasedAt}
-                  onChange={(e) => setEditForm((f) => ({ ...f, purchasedAt: e.target.value }))}
+                  id="editUnitPrice"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={editForm.unitPrice}
+                  onChange={(e) => setEditForm((f) => ({ ...f, unitPrice: e.target.value }))}
                 />
               </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="editDiscount">Diskon % (opsional)</Label>
+                <Input
+                  id="editDiscount"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="any"
+                  value={editForm.discountPercent}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, discountPercent: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Total Setelah Diskon</Label>
+                <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm font-semibold">
+                  {formatIDR(
+                    computePurchaseTotal(
+                      Number(editForm.qty) || 0,
+                      Number(editForm.unitPrice) || 0,
+                      Number(editForm.discountPercent) || 0
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editPurchasedAt">Tanggal</Label>
+              <Input
+                id="editPurchasedAt"
+                type="date"
+                value={editForm.purchasedAt}
+                onChange={(e) => setEditForm((f) => ({ ...f, purchasedAt: e.target.value }))}
+              />
             </div>
           </div>
           <DialogFooter>
